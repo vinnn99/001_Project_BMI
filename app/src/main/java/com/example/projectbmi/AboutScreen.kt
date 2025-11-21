@@ -48,7 +48,7 @@ fun AboutScreen(navController: NavController) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        Text("Vincent Gozaly Rasyid") // ganti sesuai timmu
+        Text("Team Of BMI") // ganti sesuai timmu
         Text("2025")
 
         Spacer(modifier = Modifier.height(36.dp))
