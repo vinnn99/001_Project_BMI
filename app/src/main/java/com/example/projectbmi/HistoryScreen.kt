@@ -6,23 +6,53 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projectbmi.model.BMIRecord
 import java.text.SimpleDateFormat
 import java.util.*
+import android.util.Log
 
 @Composable
 fun HistoryScreen(navController: androidx.navigation.NavController, vm: HistoryViewModel = viewModel()) {
+    Log.d("HistoryScreen", "Rendering history screen")
     val list = vm.history.collectAsState().value
+    Log.d("HistoryScreen", "History loaded: ${list.size} records")
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("History", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(12.dp))
-        LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(list) { item ->
-                HistoryRow(item)
+        
+        if (list.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Text(
+                        "No history yet",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Start by calculating your BMI to see your history here",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(list) { item ->
+                    HistoryRow(item)
+                }
             }
         }
     }

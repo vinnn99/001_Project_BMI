@@ -29,10 +29,15 @@ fun OnboardingScreen(
 
     LaunchedEffect(state.isComplete) {
         if (state.isComplete) {
-            // Save profile to Firestore (app now uses Firestore as single source-of-truth)
+            // Navigate immediately to the BMI calculator so user flow isn't blocked.
+            // Save the profile asynchronously in the background; navigation should not depend on it.
+            navController.navigate("calculator") {
+                popUpTo(0) { inclusive = true }
+            }
+
+            // Attempt to save profile in background if signed in.
             val uid = Firebase.auth.currentUser?.uid
             if (!uid.isNullOrBlank()) {
-                // build Firestore DTO
                 val dto = com.example.projectbmi.repository.UserProfileDto(
                     fitnessGoals = state.userProfile.fitnessGoals.map { it.toString() },
                     exerciseFrequency = state.userProfile.exerciseFrequency?.toString(),
@@ -40,39 +45,17 @@ fun OnboardingScreen(
                     sleepDuration = state.userProfile.sleepDuration?.toString(),
                     weightManagementChallenges = state.userProfile.weightManagementChallenges.map { it.toString() }
                 )
-                
-                // Save profile before navigating to ensure it completes
                 scope.launch {
                     try {
                         com.example.projectbmi.repository.FirestoreProfileRepository.saveProfile(uid, dto)
-                        android.widget.Toast.makeText(
-                            context,
-                            "Profile saved to Firestore.",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                        
-                        // Only navigate after successful save
-                        navController.navigate("home") {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        android.widget.Toast.makeText(context, "Profile saved.", android.widget.Toast.LENGTH_SHORT).show()
                     } catch (e: Exception) {
-                        android.util.Log.e("OnboardingScreen", "Failed to save profile to Firestore", e)
-                        android.widget.Toast.makeText(
-                            context,
-                            "Failed to save profile: ${e.message}",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                        // Don't navigate if save failed
+                        android.util.Log.w("OnboardingScreen", "Failed to save profile to Firestore", e)
                     }
                 }
             } else {
-                // No uid available (rare if MainActivity signs in); inform user
-                android.widget.Toast.makeText(
-                    context,
-                    "Unable to save profile: not signed in. Please restart the app to sign in.",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-                // Don't navigate if not signed in
+                // Not signed in; saving will be skipped but navigation proceeds.
+                android.util.Log.w("OnboardingScreen", "User not signed in; skipping profile save")
             }
         }
     }
@@ -84,95 +67,115 @@ fun OnboardingScreen(
     ) {
         when (state.currentPage) {
             is OnboardingPage.FitnessGoals -> {
+                // Local selection to ensure immediate UI response and reliable enablement
+                var localSelected by remember {
+                    mutableStateOf(state.userProfile.fitnessGoals.map { it.label() }.toMutableSet<String>())
+                }
+
                 MultiChoiceQuestion(
                     title = "What is your primary goal for using this app?",
                     options = FitnessGoal.values().map { it.label() },
-                    selectedOptions = state.userProfile.fitnessGoals.map { it.label() }.toSet(),
+                    selectedOptions = localSelected,
                     onOptionSelected = { selected ->
-                        val goals = FitnessGoal.values().filter { 
-                            selected.contains(it.label()) 
+                        localSelected = selected.toMutableSet()
+                        val goals = FitnessGoal.values().filter {
+                            selected.contains(it.label())
                         }.toSet()
                         viewModel.updateFitnessGoals(goals)
                     }
                 )
                 OnboardingNextButton(
-                    enabled = state.userProfile.fitnessGoals.isNotEmpty()
+                    enabled = localSelected.isNotEmpty()
                 ) {
                     viewModel.navigateNext()
                 }
             }
 
             is OnboardingPage.ExerciseFrequency -> {
+                var localSelected by remember { mutableStateOf(state.userProfile.exerciseFrequency?.label()) }
+
                 SingleChoiceQuestion(
                     title = "How often do you exercise per week?",
                     options = ExerciseFrequency.values().map { it.label() },
-                    selectedOption = state.userProfile.exerciseFrequency?.label(),
+                    selectedOption = localSelected,
                     onOptionSelected = { selected ->
-                        val frequency = ExerciseFrequency.values().first { 
-                            it.label() == selected 
+                        localSelected = selected
+                        val frequency = ExerciseFrequency.values().first {
+                            it.label() == selected
                         }
                         viewModel.updateExerciseFrequency(frequency)
                     }
                 )
                 OnboardingNextButton(
-                    enabled = state.userProfile.exerciseFrequency != null
+                    enabled = localSelected != null
                 ) {
                     viewModel.navigateNext()
                 }
             }
 
             is OnboardingPage.DietPattern -> {
+                var localSelected by remember { mutableStateOf(state.userProfile.dietPattern?.label()) }
+
                 SingleChoiceQuestion(
                     title = "What is your typical eating pattern?",
                     options = DietPattern.values().map { it.label() },
-                    selectedOption = state.userProfile.dietPattern?.label(),
+                    selectedOption = localSelected,
                     onOptionSelected = { selected ->
-                        val pattern = DietPattern.values().first { 
-                            it.label() == selected 
+                        localSelected = selected
+                        val pattern = DietPattern.values().first {
+                            it.label() == selected
                         }
                         viewModel.updateDietPattern(pattern)
                     }
                 )
                 OnboardingNextButton(
-                    enabled = state.userProfile.dietPattern != null
+                    enabled = localSelected != null
                 ) {
                     viewModel.navigateNext()
                 }
             }
 
             is OnboardingPage.SleepDuration -> {
+                var localSelected by remember { mutableStateOf(state.userProfile.sleepDuration?.label()) }
+
                 SingleChoiceQuestion(
                     title = "How many hours do you usually sleep per night?",
                     options = SleepDuration.values().map { it.label() },
-                    selectedOption = state.userProfile.sleepDuration?.label(),
+                    selectedOption = localSelected,
                     onOptionSelected = { selected ->
-                        val duration = SleepDuration.values().first { 
-                            it.label() == selected 
+                        localSelected = selected
+                        val duration = SleepDuration.values().first {
+                            it.label() == selected
                         }
                         viewModel.updateSleepDuration(duration)
                     }
                 )
                 OnboardingNextButton(
-                    enabled = state.userProfile.sleepDuration != null
+                    enabled = localSelected != null
                 ) {
                     viewModel.navigateNext()
                 }
             }
 
             is OnboardingPage.Challenges -> {
+                var localSelected by remember {
+                    mutableStateOf(state.userProfile.weightManagementChallenges.map { it.label() }.toMutableSet<String>())
+                }
+
                 MultiChoiceQuestion(
                     title = "What do you find most challenging about maintaining your ideal weight?",
                     options = WeightManagementChallenge.values().map { it.label() },
-                    selectedOptions = state.userProfile.weightManagementChallenges.map { it.label() }.toSet(),
+                    selectedOptions = localSelected,
                     onOptionSelected = { selected ->
-                        val challenges = WeightManagementChallenge.values().filter { 
-                            selected.contains(it.label()) 
+                        localSelected = selected.toMutableSet()
+                        val challenges = WeightManagementChallenge.values().filter {
+                            selected.contains(it.label())
                         }.toSet()
                         viewModel.updateChallenges(challenges)
                     }
                 )
                 OnboardingNextButton(
-                    enabled = state.userProfile.weightManagementChallenges.isNotEmpty()
+                    enabled = localSelected.isNotEmpty()
                 ) {
                     viewModel.navigateNext()
                 }

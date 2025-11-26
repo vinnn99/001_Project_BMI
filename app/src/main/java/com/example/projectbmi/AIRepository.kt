@@ -33,4 +33,58 @@ class AIRepository {
 
         return tips
     }
+
+    /**
+     * Generate a simple 7-day schedule (one short task per day) tailored to the BMI category and gender.
+     * This is intentionally lightweight and deterministic so it can run locally without network.
+     */
+    fun generateWeeklySchedule(bmi: Float, category: String, gender: String, age: Int = 0): List<String> {
+        val lower = category.lowercase()
+        val baseTasks = when {
+            lower.contains("underweight") || lower.contains("kurus") -> listOf(
+                "Eat 3 balanced meals + 2 nutritious snacks",
+                "Add a protein- and calorie-dense smoothie",
+                "Strength training: 20–30 min (bodyweight)",
+                "Include healthy fats (nuts, avocado) in meals",
+                "Try a calorie-dense breakfast (eggs, oats)",
+                "Light walk + focus on portion size increases",
+                "Prepare meal plan with extra calories"
+            )
+            lower.contains("overweight") || lower.contains("gemuk") -> listOf(
+                "30 min brisk walking or cycling",
+                "Swap soda for water or unsweetened tea",
+                "Include a vegetable-rich dinner",
+                "Strength training: 20–30 min (light weights)",
+                "Limit sugary snacks today",
+                "Try a guided home cardio session (20 min)",
+                "Plan healthy meals for the week"
+            )
+            lower.contains("obese") -> listOf(
+                "20 min low-impact walking or pool exercise",
+                "Choose a high-protein breakfast",
+                "Replace one meal with a large salad",
+                "Short resistance band session: 15–20 min",
+                "Avoid sugary drinks today",
+                "Practice mindful eating at each meal",
+                "Schedule a short consult/check-in with a provider"
+            )
+            else -> listOf(
+                "30 min activity (brisk walk)",
+                "Maintain balanced meals",
+                "Strength training: 2 sets of basic moves",
+                "Hydration focus: 8 glasses",
+                "Try a new healthy recipe",
+                "Track food intake for today",
+                "Rest and light mobility work"
+            )
+        }
+
+        // Small personalization tweaks
+        val genderHint = if (gender.lowercase().startsWith("f")) " (prioritize bone health)" else ""
+
+        return baseTasks.mapIndexed { idx, task ->
+            // Add gentle personalization without exposing PII
+            if (idx == 0) "$task$genderHint" else task
+        }
+    }
 }

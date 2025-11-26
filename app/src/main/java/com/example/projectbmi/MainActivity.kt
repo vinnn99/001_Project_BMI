@@ -19,10 +19,30 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.projectbmi.ui.screens.OnboardingScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.projectbmi.HistoryViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Install a global uncaught-exception handler to capture crashes
+        try {
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                try {
+                    android.util.Log.e("UncaughtException", "Uncaught exception in thread ${thread.name}", throwable)
+                    // attempt to persist stacktrace to app-private file for later inspection
+                    val crashFile = java.io.File(filesDir, "last_crash.log")
+                    crashFile.appendText("Thread: ${thread.name}\n")
+                    crashFile.appendText(android.util.Log.getStackTraceString(throwable) + "\n\n")
+                } catch (_: Exception) {
+                }
+                // rethrow to let system handle termination
+                android.os.Process.killProcess(android.os.Process.myPid())
+                System.exit(2)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Failed to install global exception handler", e)
+        }
         // Initialize Firebase and sign-in anonymously so we can store user profiles in Firestore
         try {
             FirebaseApp.initializeApp(this)
@@ -87,11 +107,15 @@ fun BMIMobileApp() {
     NavHost(navController = navController, startDestination = "splash") {
         composable("splash") { SplashScreen(navController) }
         composable("onboarding") { OnboardingScreen(navController) }
-        composable("home") { HomeScreen(navController) }
+        composable("home") {
+            val historyViewModel: com.example.projectbmi.HistoryViewModel = viewModel()
+            HomeScreen(navController, historyViewModel)
+        }
         composable("calculator") { BMICalculatorScreen(navController) }
         composable("result/{bmi}/{category}/{gender}") { backStackEntry ->
             val bmi = backStackEntry.arguments?.getString("bmi") ?: "0.0"
-            val category = backStackEntry.arguments?.getString("category") ?: "Unknown"
+            val encodedCategory = backStackEntry.arguments?.getString("category") ?: "Unknown"
+            val category = java.net.URLDecoder.decode(encodedCategory, "UTF-8")
             val gender = backStackEntry.arguments?.getString("gender") ?: "Male"
             ResultScreen(navController, bmi, category, gender)
         }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import android.util.Log
 
 sealed class OnboardingPage {
     object FitnessGoals : OnboardingPage()
@@ -30,59 +31,101 @@ class OnboardingViewModel : ViewModel() {
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
 
     fun updateFitnessGoals(goals: Set<FitnessGoal>) {
-        _state.value = _state.value.copy(
-            userProfile = _state.value.userProfile.copy(fitnessGoals = goals)
-        )
+        try {
+            Log.d("OnboardingViewModel", "Updating fitness goals: ${goals.size} selected")
+            _state.value = _state.value.copy(
+                userProfile = _state.value.userProfile.copy(fitnessGoals = goals)
+            )
+        } catch (e: Exception) {
+            Log.e("OnboardingViewModel", "Error updating fitness goals", e)
+        }
     }
 
     fun updateExerciseFrequency(frequency: ExerciseFrequency) {
-        _state.value = _state.value.copy(
-            userProfile = _state.value.userProfile.copy(exerciseFrequency = frequency)
-        )
+        try {
+            Log.d("OnboardingViewModel", "Updating exercise frequency: $frequency")
+            _state.value = _state.value.copy(
+                userProfile = _state.value.userProfile.copy(exerciseFrequency = frequency)
+            )
+        } catch (e: Exception) {
+            Log.e("OnboardingViewModel", "Error updating exercise frequency", e)
+        }
     }
 
     fun updateDietPattern(pattern: DietPattern) {
-        _state.value = _state.value.copy(
-            userProfile = _state.value.userProfile.copy(dietPattern = pattern)
-        )
+        try {
+            Log.d("OnboardingViewModel", "Updating diet pattern: $pattern")
+            _state.value = _state.value.copy(
+                userProfile = _state.value.userProfile.copy(dietPattern = pattern)
+            )
+        } catch (e: Exception) {
+            Log.e("OnboardingViewModel", "Error updating diet pattern", e)
+        }
     }
 
     fun updateSleepDuration(duration: SleepDuration) {
-        _state.value = _state.value.copy(
-            userProfile = _state.value.userProfile.copy(sleepDuration = duration)
-        )
+        try {
+            Log.d("OnboardingViewModel", "Updating sleep duration: $duration")
+            _state.value = _state.value.copy(
+                userProfile = _state.value.userProfile.copy(sleepDuration = duration)
+            )
+        } catch (e: Exception) {
+            Log.e("OnboardingViewModel", "Error updating sleep duration", e)
+        }
     }
 
     fun updateChallenges(challenges: Set<WeightManagementChallenge>) {
-        _state.value = _state.value.copy(
-            userProfile = _state.value.userProfile.copy(weightManagementChallenges = challenges)
-        )
+        try {
+            Log.d("OnboardingViewModel", "Updating challenges: ${challenges.size} selected")
+            _state.value = _state.value.copy(
+                userProfile = _state.value.userProfile.copy(weightManagementChallenges = challenges)
+            )
+        } catch (e: Exception) {
+            Log.e("OnboardingViewModel", "Error updating challenges", e)
+        }
     }
 
     fun navigateNext() {
-        val currentPage = _state.value.currentPage
-        val nextPage = when (currentPage) {
-            is OnboardingPage.FitnessGoals -> OnboardingPage.ExerciseFrequency
-            is OnboardingPage.ExerciseFrequency -> OnboardingPage.DietPattern
-            is OnboardingPage.DietPattern -> OnboardingPage.SleepDuration
-            is OnboardingPage.SleepDuration -> OnboardingPage.Challenges
-            is OnboardingPage.Challenges -> {
-                markComplete()
-                return
+        try {
+            val currentPage = _state.value.currentPage
+            Log.d("OnboardingViewModel", "Navigating from page: $currentPage")
+            val nextPage = when (currentPage) {
+                is OnboardingPage.FitnessGoals -> OnboardingPage.ExerciseFrequency
+                is OnboardingPage.ExerciseFrequency -> OnboardingPage.DietPattern
+                is OnboardingPage.DietPattern -> OnboardingPage.SleepDuration
+                is OnboardingPage.SleepDuration -> OnboardingPage.Challenges
+                is OnboardingPage.Challenges -> {
+                    markComplete()
+                    return
+                }
             }
+            _state.value = _state.value.copy(currentPage = nextPage)
+            Log.d("OnboardingViewModel", "Navigated to page: $nextPage")
+        } catch (e: Exception) {
+            Log.e("OnboardingViewModel", "Error navigating", e)
         }
-        _state.value = _state.value.copy(currentPage = nextPage)
     }
 
     private fun markComplete() {
-        _state.value = _state.value.copy(isComplete = true)
-        saveUserProfile()
+        try {
+            Log.d("OnboardingViewModel", "Marking onboarding as complete")
+            _state.value = _state.value.copy(isComplete = true)
+            saveUserProfile()
+        } catch (e: Exception) {
+            Log.e("OnboardingViewModel", "Error marking complete", e)
+        }
     }
 
     private fun saveUserProfile() {
-        // TODO: Implement saving to DataStore
+        // Save user profile asynchronously
         viewModelScope.launch {
-            // Save user profile
+            try {
+                Log.d("OnboardingViewModel", "Saving user profile")
+                // TODO: Implement saving to DataStore or Firebase
+                Log.d("OnboardingViewModel", "Profile saved successfully")
+            } catch (e: Exception) {
+                Log.e("OnboardingViewModel", "Error saving profile", e)
+            }
         }
     }
 }

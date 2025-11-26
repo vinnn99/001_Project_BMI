@@ -7,8 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +23,7 @@ import com.example.projectbmi.viewmodel.ChatViewModel
 import com.example.projectbmi.viewmodel.ChatMessage
 
 class ChatViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             return ChatViewModel(application) as T
@@ -46,14 +47,15 @@ fun ChatScreen(
     // Send a concise context prompt once so the AI reply appears as the first message
     LaunchedEffect(Unit) {
         if (uiState.messages.isEmpty()) {
-            // Provide a clearer prompt: include context and explicit formatting instructions
+            // Provide a clearer system prompt: include context and explicit formatting instructions
             val prompt = """
                 Based on your profile:
                 $initialContext
-                
+
                 Please provide personalized coaching advice for improving health and fitness. Consider all aspects of the profile including BMI, goals, current exercise habits, diet preferences, sleep patterns, and any challenges faced.
             """.trimIndent()
-            chatViewModel.sendMessage(prompt)
+            // Send as system prompt so it will not be shown as a user message; assistant reply will appear
+            chatViewModel.sendSystemPrompt(prompt)
         }
     }
 
@@ -63,7 +65,7 @@ fun ChatScreen(
                 title = { Text("Chat with AI Coach") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -106,10 +108,19 @@ fun ChatScreen(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
-            // Error message if any
-            uiState.error?.let { error ->
+            // Error message if any — show friendly guidance and disable input for auth/connectivity issues
+            val errorMsg = uiState.error
+            val isAuthError = errorMsg?.contains("API key", ignoreCase = true) == true || errorMsg?.contains("401") == true
+            val isNetworkError = errorMsg?.contains("internet", ignoreCase = true) == true || errorMsg?.contains("UnknownHostException", ignoreCase = true) == true
+            errorMsg?.let { error ->
+                val friendly = when {
+                    isAuthError -> "Chat disabled: API key is not configured or invalid. Please add `DEEPSEEK_API_KEY` to your local `gradle.properties` or set it as an environment variable."
+                    isNetworkError -> "Cannot connect: please check your internet connection."
+                    else -> error
+                }
+
                 Text(
-                    text = error,
+                    text = friendly,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
@@ -127,7 +138,8 @@ fun ChatScreen(
                     onValueChange = { chatViewModel.userInput.value = it },
                     placeholder = { Text("Type your question...") },
                     modifier = Modifier.weight(1f),
-                    maxLines = 3
+                    maxLines = 3,
+                    enabled = uiState.error == null || !(uiState.error?.contains("401") == true || uiState.error?.contains("API key", ignoreCase = true) == true)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
@@ -136,13 +148,13 @@ fun ChatScreen(
                             chatViewModel.sendMessage(messageText)
                         }
                     },
-                    enabled = !uiState.isLoading && messageText.isNotBlank(),
+                    enabled = (uiState.error == null || !isAuthError) && !uiState.isLoading && messageText.isNotBlank(),
                     colors = IconButtonDefaults.iconButtonColors(
                         containerColor = MaterialTheme.colorScheme.tertiary
                     )
                 ) {
                     Icon(
-                        Icons.Default.Send,
+                        Icons.AutoMirrored.Default.Send,
                         contentDescription = "Send",
                         tint = MaterialTheme.colorScheme.onTertiary
                     )

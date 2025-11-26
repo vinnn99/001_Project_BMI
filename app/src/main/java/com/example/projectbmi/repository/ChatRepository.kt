@@ -116,4 +116,37 @@ class ChatRepository(
             return@withContext Result.failure(Exception("Failed to connect to AI service. Please check your internet connection."))
         }
     }
+
+    // Send a system-only prompt (won't be shown as a user message in UI)
+    suspend fun sendSystemPrompt(systemPrompt: String): Result<String> = withContext(Dispatchers.IO) {
+        if (!NetworkUtils.isInternetAvailable(context)) {
+            return@withContext Result.failure(Exception("No internet connection available. Please check your connection and try again."))
+        }
+
+        try {
+            val messages = listOf(
+                Message(role = "system", content = systemPrompt)
+            )
+
+            val request = ChatRequest(messages = messages)
+            val response = makeRequestWithRetry(request)
+
+            if (response.isSuccessful) {
+                response.body()?.let { chatResponse ->
+                    chatResponse.choices.firstOrNull()?.message?.content?.let { content ->
+                        return@withContext Result.success(content)
+                    }
+                }
+                return@withContext Result.failure(Exception("Invalid response format from AI"))
+            } else {
+                return@withContext when (response.code()) {
+                    429 -> Result.failure(Exception("Too many requests. Please wait a moment and try again."))
+                    500, 502, 503, 504 -> Result.failure(Exception("AI service is temporarily unavailable. Please try again later."))
+                    else -> Result.failure(Exception("Error: ${response.code()} - ${response.message()}"))
+                }
+            }
+        } catch (e: Exception) {
+            return@withContext Result.failure(Exception("Failed to connect to AI service. Please check your internet connection."))
+        }
+    }
 }

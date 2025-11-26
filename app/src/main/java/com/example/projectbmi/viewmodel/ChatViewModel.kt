@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.projectbmi.repository.ChatRepository
+import com.example.projectbmi.utils.TextUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,15 +49,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             error = when (e) {
-                                is java.net.UnknownHostException -> "Tidak dapat terhubung ke internet. Periksa koneksi Anda."
+                                is java.net.UnknownHostException -> "Cannot connect to the internet. Please check your connection."
                                 is retrofit2.HttpException -> {
                                     when (e.code()) {
-                                        401 -> "API key tidak valid atau kadaluarsa"
-                                        429 -> "Terlalu banyak permintaan. Coba lagi nanti."
-                                        else -> "Terjadi kesalahan: ${e.message}"
+                                        401 -> "API key is invalid or expired"
+                                        429 -> "Too many requests. Please try again later."
+                                        else -> "Error: ${e.message}"
                                     }
                                 }
-                                else -> e.message ?: "Terjadi kesalahan yang tidak diketahui"
+                                else -> e.message ?: "An unknown error occurred"
                             }
                         )
                         android.util.Log.e("ChatViewModel", "Error validating API key", e)
@@ -64,7 +65,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Terjadi kesalahan yang tidak terduga: ${e.message}"
+                    error = "Unexpected error: ${e.message}"
                 )
                 android.util.Log.e("ChatViewModel", "Unexpected error", e)
             }
@@ -84,7 +85,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.sendMessage(message)
                 .onSuccess { response ->
-                    val assistantMessage = ChatMessage(response, isUserMessage = false)
+                    val cleaned = TextUtils.sanitizeAssistantText(response)
+                    val assistantMessage = ChatMessage(cleaned, isUserMessage = false)
                     _uiState.value = _uiState.value.copy(
                         messages = _uiState.value.messages + assistantMessage,
                         isLoading = false
@@ -99,5 +101,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         userInput.value = ""
+    }
+
+    // Send a system prompt that should NOT be shown as a user message in the UI
+    fun sendSystemPrompt(systemPrompt: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            repository.sendSystemPrompt(systemPrompt)
+                .onSuccess { response ->
+                    val cleaned = TextUtils.sanitizeAssistantText(response)
+                    val assistantMessage = ChatMessage(cleaned, isUserMessage = false)
+                    _uiState.value = _uiState.value.copy(
+                        messages = _uiState.value.messages + assistantMessage,
+                        isLoading = false
+                    )
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = throwable.message ?: "An unknown error occurred"
+                    )
+                }
+        }
     }
 }

@@ -5,8 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +25,7 @@ import androidx.navigation.NavController
 @Composable
 fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewModel()) {
     var step by remember { mutableStateOf(0) }
+    val navigationTriggered = remember { mutableStateOf(false) }
 
     val gender by vm.gender.collectAsState()
     val age by vm.age.collectAsState()
@@ -33,10 +34,18 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
     // History VM to persist full records (height/weight)
     val historyVm: HistoryViewModel = viewModel()
 
+    android.util.Log.d("BMICalc", "Rendering: step=$step, navigationTriggered=${navigationTriggered.value}")
+
+    DisposableEffect(Unit) {
+        onDispose {
+            android.util.Log.d("BMICalc", "Screen disposed")
+        }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Height", style = MaterialTheme.typography.titleLarge) },
+                    title = { Text("BMI Calculator", style = MaterialTheme.typography.titleLarge) },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 )
@@ -88,7 +97,11 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                                 ) { Text("Male", color = MaterialTheme.colorScheme.onTertiary) }
                             } else {
                                 OutlinedButton(
-                                    onClick = { vm.setGender("Male") },
+                                        onClick = {
+                                            vm.setGender("Male")
+                                            // auto-advance when gender selected
+                                            if (step == 0) step = 1
+                                        },
                                     colors = ButtonDefaults.outlinedButtonColors(containerColor = unselectedBg)
                                 ) { Text("Male") }
                             }
@@ -101,7 +114,11 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                                 ) { Text("Female", color = MaterialTheme.colorScheme.onTertiary) }
                             } else {
                                 OutlinedButton(
-                                    onClick = { vm.setGender("Female") },
+                                        onClick = {
+                                            vm.setGender("Female")
+                                            // auto-advance when gender selected
+                                            if (step == 0) step = 1
+                                        },
                                     colors = ButtonDefaults.outlinedButtonColors(containerColor = unselectedBg)
                                 ) { Text("Female") }
                             }
@@ -111,11 +128,11 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                         Text("What is your age?", fontSize = 18.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(18.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { if (age > 1) vm.setAge(age - 1) }) { Icon(Icons.Default.ArrowBack, contentDescription = "age-") }
+                            IconButton(onClick = { if (age > 1) vm.setAge(age - 1) }) { Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "age-") }
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(age.toString(), fontSize = 32.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.width(12.dp))
-                            IconButton(onClick = { if (age < 120) vm.setAge(age + 1) }) { Icon(Icons.Default.ArrowForward, contentDescription = "age+") }
+                            IconButton(onClick = { if (age < 120) vm.setAge(age + 1) }) { Icon(Icons.AutoMirrored.Default.ArrowForward, contentDescription = "age+") }
                         }
                     }
                     2 -> {
@@ -143,6 +160,10 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                                 } else {
                                     heightError = ""
                                     vm.setHeight(parsed)
+                                        if (step == 2) {
+                                            // auto-advance to weight step
+                                            step = 3
+                                        }
                                 }
                             },
                             label = { Text("Height (cm)") },
@@ -173,7 +194,35 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                                 } else {
                                     weightError = ""
                                     vm.setWeight(parsed)
-                                }
+                                        // If weight valid and not yet navigated, calculate and navigate automatically
+                                        if (!navigationTriggered.value && step == 3) {
+                                            navigationTriggered.value = true
+                                            try {
+                                                val (bmi, category) = vm.calculateBmi()
+                                                android.util.Log.d("BMICalc", "Calculated BMI: $bmi, Category: $category")
+                                                // Save full record including height and weight before navigating
+                                                val rec = BMIRecord(
+                                                    timestamp = System.currentTimeMillis(),
+                                                    bmi = bmi,
+                                                    category = category,
+                                                    gender = vm.gender.value,
+                                                    heightCm = vm.height.value,
+                                                    weightKg = vm.weight.value
+                                                )
+                                                historyVm.saveRecord(rec)
+                                                val encodedCategory = java.net.URLEncoder.encode(category, "UTF-8")
+                                                val bmiFormatted = String.format("%.1f", bmi)
+                                                val route = "result/$bmiFormatted/$encodedCategory/${vm.gender.value}"
+                                                android.util.Log.d("BMICalc", "Navigating to: $route")
+                                                navController.navigate(route) {
+                                                    popUpTo("calculator") { inclusive = true }
+                                                }
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("BMICalc", "Error during auto-navigate", e)
+                                                navigationTriggered.value = false
+                                            }
+                                        }
+                                    }
                             },
                             label = { Text("Weight (kg)") },
                             singleLine = true,
@@ -205,18 +254,27 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
 
                         if (canAdvance) {
                             if (step < 3) step += 1 else {
-                                val (bmi, category) = vm.calculateBmi()
-                                // Save full record including height and weight before navigating
-                                val rec = BMIRecord(
-                                    timestamp = System.currentTimeMillis(),
-                                    bmi = bmi,
-                                    category = category,
-                                    gender = vm.gender.value,
-                                    heightCm = vm.height.value,
-                                    weightKg = vm.weight.value
-                                )
-                                historyVm.saveRecord(rec)
-                                navController.navigate("result/${"%.1f".format(bmi)}/$category/${vm.gender.value}")
+                                try {
+                                    val (bmi, category) = vm.calculateBmi()
+                                    android.util.Log.d("BMICalc", "FINISH button: BMI=$bmi, Category=$category")
+                                    // Save full record including height and weight before navigating
+                                    val rec = BMIRecord(
+                                        timestamp = System.currentTimeMillis(),
+                                        bmi = bmi,
+                                        category = category,
+                                        gender = vm.gender.value,
+                                        heightCm = vm.height.value,
+                                        weightKg = vm.weight.value
+                                    )
+                                    historyVm.saveRecord(rec)
+                                    val encodedCategory = java.net.URLEncoder.encode(category, "UTF-8")
+                                    val bmiFormatted = String.format("%.1f", bmi)
+                                    val route = "result/$bmiFormatted/$encodedCategory/${vm.gender.value}"
+                                    android.util.Log.d("BMICalc", "FINISH: Navigating to route: $route")
+                                    navController.navigate(route)
+                                } catch (e: Exception) {
+                                    android.util.Log.e("BMICalc", "Error on FINISH button click", e)
+                                }
                             }
                         }
                     }) { Text(if (step < 3) "NEXT" else "FINISH") }

@@ -79,9 +79,11 @@ class DeepseekClient(private val apiKey: String) {
     companion object {
         @Volatile
         private var instance: DeepseekClient? = null
+        // Expose API key constant (reads from generated BuildConfig)
+        const val API_KEY: String = com.example.projectbmi.BuildConfig.DEEPSEEK_API_KEY
 
-        fun getInstance(): DeepseekClient {
-            val key = BuildConfig.DEEPSEEK_API_KEY
+        fun getInstance(apiKey: String? = null): DeepseekClient {
+            val key = apiKey ?: API_KEY
             return instance ?: synchronized(this) {
                 instance ?: DeepseekClient(key).also { instance = it }
             }
