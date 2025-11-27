@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.shadow
 import androidx.navigation.NavController
 import java.time.LocalDate
 
@@ -220,57 +221,35 @@ fun ResultScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // shared gradient for primary button and shared sizes
+                    val btnGradient = Brush.horizontalGradient(
+                        colors = listOf(Color(0xFF7B68EE), Color(0xFF5A4AE3), Color(0xFF6B5BE3))
+                    )
                     // Ask AI Button
-                    Button(
-                        onClick = { navController.navigate("chat/$categoryText") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6366F1),
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(24.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
-                    ) {
-                        Text("Ask AI", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    }
+                    GradientActionButton(
+                        text = "Ask AI",
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        gradient = btnGradient,
+                        onClick = { navController.navigate("chat/$categoryText") }
+                    )
 
                     // Recalculate Button
-                    Button(
+                    SecondaryActionButton(
+                        text = "Recalculate",
+                        modifier = Modifier.weight(1f).height(50.dp),
                         onClick = {
                             navController.navigate("calculator") {
                                 popUpTo("result/{bmi}/{category}/{gender}") { inclusive = true }
                             }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE8E8EC),
-                            contentColor = Color(0xFF333333)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
-                    ) {
-                        Text("Recalculate", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = Color(0xFF333333))
-                    }
+                        }
+                    )
 
                     // History Button
-                    Button(
-                        onClick = { navController.navigate("history") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE8E8EC),
-                            contentColor = Color(0xFF333333)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
-                    ) {
-                        Text("History", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = Color(0xFF333333))
-                    }
+                    SecondaryActionButton(
+                        text = "History",
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        onClick = { navController.navigate("history") }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -536,6 +515,47 @@ fun DayCircle(day: String, isActive: Boolean = false) {
             color = if (isActive) Color.Black else Color(0xFF666666),
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+fun GradientActionButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    gradient: Brush,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .shadow(6.dp, shape = RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
+            .background(brush = gradient)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = text, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+fun SecondaryActionButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    borderColor: Color = Color(0xFF5A4AE3),
+    bgColor: Color = Color(0xFFF2F2F5),
+    textColor: Color = Color(0xFF5A4AE3)
+) {
+    Box(
+        modifier = modifier
+            .shadow(4.dp, shape = RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
+            .background(color = bgColor)
+            .border(BorderStroke(1.dp, borderColor.copy(alpha = 0.14f)), shape = RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = text, color = textColor, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -17,6 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+// keyboard input options intentionally not used (keep compatibility with existing Compose deps)
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projectbmi.model.BMIRecord
 import androidx.navigation.NavController
@@ -25,7 +26,7 @@ import androidx.navigation.NavController
 @Composable
 fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewModel()) {
     var step by remember { mutableStateOf(0) }
-    val navigationTriggered = remember { mutableStateOf(false) }
+    // navigationTriggered removed; navigation now only happens from NEXT/FINISH button
 
     val gender by vm.gender.collectAsState()
     val age by vm.age.collectAsState()
@@ -34,7 +35,7 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
     // History VM to persist full records (height/weight)
     val historyVm: HistoryViewModel = viewModel()
 
-    android.util.Log.d("BMICalc", "Rendering: step=$step, navigationTriggered=${navigationTriggered.value}")
+    android.util.Log.d("BMICalc", "Rendering: step=$step")
 
     DisposableEffect(Unit) {
         onDispose {
@@ -98,9 +99,8 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                             } else {
                                 OutlinedButton(
                                         onClick = {
+                                            // only set selection, don't auto-advance — NEXT button should control navigation
                                             vm.setGender("Male")
-                                            // auto-advance when gender selected
-                                            if (step == 0) step = 1
                                         },
                                     colors = ButtonDefaults.outlinedButtonColors(containerColor = unselectedBg)
                                 ) { Text("Male") }
@@ -115,9 +115,8 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                             } else {
                                 OutlinedButton(
                                         onClick = {
+                                            // only set selection, don't auto-advance — NEXT button should control navigation
                                             vm.setGender("Female")
-                                            // auto-advance when gender selected
-                                            if (step == 0) step = 1
                                         },
                                     colors = ButtonDefaults.outlinedButtonColors(containerColor = unselectedBg)
                                 ) { Text("Female") }
@@ -150,7 +149,8 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                         OutlinedTextField(
                             value = heightInput,
                             onValueChange = {
-                                val filtered = it.filter { ch -> ch.isDigit() }
+                                // only allow digits, max 3 chars (e.g., 250)
+                                var filtered = it.filter { ch -> ch.isDigit() }.take(3)
                                 heightInput = filtered
                                 val parsed = filtered.toIntOrNull()
                                 if (parsed == null) {
@@ -160,13 +160,10 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                                 } else {
                                     heightError = ""
                                     vm.setHeight(parsed)
-                                        if (step == 2) {
-                                            // auto-advance to weight step
-                                            step = 3
-                                        }
                                 }
                             },
                             label = { Text("Height (cm)") },
+                            // numeric keyboard not enforced here — keep simple validation to ensure compatibility
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             
@@ -184,7 +181,16 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                         OutlinedTextField(
                             value = weightInput,
                             onValueChange = {
-                                val filtered = it.filter { ch -> ch.isDigit() || ch == '.' }
+                                // allow digits and a single dot, and restrict to one decimal place
+                                var filtered = it.filter { ch -> ch.isDigit() || ch == '.' }
+                                val firstDot = filtered.indexOf('.')
+                                if (firstDot >= 0) {
+                                    // remove any additional dots
+                                    filtered = filtered.substring(0, firstDot + 1) + filtered.substring(firstDot + 1).replace(".", "")
+                                    // limit fractional digits to 1 (e.g., 70.5)
+                                    val fractional = filtered.substring(firstDot + 1)
+                                    if (fractional.length > 1) filtered = filtered.substring(0, firstDot + 2)
+                                }
                                 weightInput = filtered
                                 val parsed = filtered.toFloatOrNull()
                                 if (parsed == null) {
@@ -194,34 +200,6 @@ fun BMICalculatorScreen(navController: NavController, vm: BMIViewModel = viewMod
                                 } else {
                                     weightError = ""
                                     vm.setWeight(parsed)
-                                        // If weight valid and not yet navigated, calculate and navigate automatically
-                                        if (!navigationTriggered.value && step == 3) {
-                                            navigationTriggered.value = true
-                                            try {
-                                                val (bmi, category) = vm.calculateBmi()
-                                                android.util.Log.d("BMICalc", "Calculated BMI: $bmi, Category: $category")
-                                                // Save full record including height and weight before navigating
-                                                val rec = BMIRecord(
-                                                    timestamp = System.currentTimeMillis(),
-                                                    bmi = bmi,
-                                                    category = category,
-                                                    gender = vm.gender.value,
-                                                    heightCm = vm.height.value,
-                                                    weightKg = vm.weight.value
-                                                )
-                                                historyVm.saveRecord(rec)
-                                                val encodedCategory = java.net.URLEncoder.encode(category, "UTF-8")
-                                                val bmiFormatted = String.format("%.1f", bmi)
-                                                val route = "result/$bmiFormatted/$encodedCategory/${vm.gender.value}"
-                                                android.util.Log.d("BMICalc", "Navigating to: $route")
-                                                navController.navigate(route) {
-                                                    popUpTo("calculator") { inclusive = true }
-                                                }
-                                            } catch (e: Exception) {
-                                                android.util.Log.e("BMICalc", "Error during auto-navigate", e)
-                                                navigationTriggered.value = false
-                                            }
-                                        }
                                     }
                             },
                             label = { Text("Weight (kg)") },
