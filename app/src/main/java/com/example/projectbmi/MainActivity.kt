@@ -125,6 +125,9 @@ fun BMIMobileApp() {
         composable("history") {
             HistoryScreen(navController)
         }
+        composable("dailyquest") {
+            DailyQuestScreen(navController)
+        }
         composable(
             route = "chat/{context}",
             arguments = listOf(navArgument("context") { type = NavType.StringType })

@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavController
 import java.time.LocalDate
 
@@ -81,11 +82,10 @@ fun ResultScreen(
     // Dynamic recommendations based on category and gender
     val recommendations = getRecommendations(categoryText, genderText)
 
-    // AI-generated weekly schedule
-    val aiRepo = AIRepository()
-    var weeklySchedule by remember { mutableStateOf<List<String>>(emptyList()) }
-    var generating by remember { mutableStateOf(false) }
-    var showTasksDialog by remember { mutableStateOf(false) }
+    // Read any previously saved weekly schedule from prefs (Daily Quest page owns generation)
+    val prefs = try {
+        context.getSharedPreferences("bmi_prefs", Context.MODE_PRIVATE)
+    } catch (e: Exception) { null }
 
     // Simple entry animation flags
     var startAnim by remember { mutableStateOf(false) }
@@ -338,119 +338,127 @@ fun ResultScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .clickable {
-                            if (weeklySchedule.isEmpty()) {
-                                generating = true
-                                weeklySchedule = AIRepository().generateWeeklySchedule(bmiValue.toFloat(), categoryText, genderText)
-                                try {
-                                    val prefs = context.getSharedPreferences("bmi_prefs", Context.MODE_PRIVATE)
-                                    prefs.edit().putString("weekly_schedule", weeklySchedule.joinToString("||")).apply()
-                                } catch (_: Exception) {}
-                                generating = false
-                            }
-                            showTasksDialog = true
+                            navController.navigate("dailyquest")
                         },
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9F0)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
-                    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Daily Quest",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF333333)
-                            )
-                            if (generating) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF6366F1))
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowForward,
-                                    contentDescription = "View schedule",
-                                    tint = Color(0xFF6366F1),
-                                    modifier = Modifier.size(22.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color(0xFFFFD45A).copy(alpha = 0.15f),
+                                        Color(0xFFFFA500).copy(alpha = 0.08f),
+                                        Color.White
+                                    ),
+                                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                    end = androidx.compose.ui.geometry.Offset(0f, 500f)
                                 )
+                            )
+                    ) {
+                        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            // Header with title and icon
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Daily Quest",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color(0xFFD97706),
+                                        fontSize = 24.sp
+                                    )
+                                    Text(
+                                        "Complete your daily goal",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFA16207),
+                                        fontStyle = FontStyle.Italic
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(Color(0xFFFFD45A), Color(0xFFFFA500))
+                                            ),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowForward,
+                                        contentDescription = "View schedule",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
-                        }
 
-                        val todayIndex = LocalDate.now().dayOfWeek.value % 7
-                        val todaysTask = weeklySchedule.getOrNull(todayIndex)
+                            val todayIndex = LocalDate.now().dayOfWeek.value % 7
+                            val savedSchedule = try {
+                                prefs?.getString("weekly_schedule", "")?.split("||") ?: emptyList()
+                            } catch (e: Exception) { emptyList<String>() }
+                            val todaysTask = savedSchedule.getOrNull(todayIndex)
 
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFFFEDD5),
-                            tonalElevation = 0.dp
-                        ) {
+                            // Today's Goal box with subtle gradient
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .shadow(4.dp, shape = RoundedCornerShape(14.dp)),
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0xFFFEF3C7),
+                                tonalElevation = 0.dp
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp)
+                                ) {
+                                    Text(
+                                        "Today's Goal",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF78350F)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        todaysTask ?: "Generate a schedule to get started",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF92400E),
+                                        lineHeight = 20.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            // Call-to-action text
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.Top
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
                             ) {
-                                Text("📌", fontSize = 18.sp, modifier = Modifier.padding(top = 2.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        "Today's Goal",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF5D4037)
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        todaysTask ?: "Tap to generate daily task",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF5D4037),
-                                        maxLines = 3,
-                                        lineHeight = 18.sp
-                                    )
-                                }
+                                Text(
+                                    "📅 Tap to view your weekly schedule",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFB45309),
+                                    fontStyle = FontStyle.Italic,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
-
-                        Text(
-                            "📅 Tap card to view full weekly schedule",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFAA9B83),
-                            fontStyle = FontStyle.Italic
-                        )
                     }
                 }
-
-                // Weekly Tasks Dialog
-                if (showTasksDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showTasksDialog = false },
-                        confirmButton = {
-                            TextButton(onClick = { showTasksDialog = false }) {
-                                Text("Close")
-                            }
-                        },
-                        title = { Text("Weekly Tasks") },
-                        text = {
-                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                                val schedule = if (weeklySchedule.isEmpty()) {
-                                    AIRepository().generateWeeklySchedule(bmiValue.toFloat(), categoryText, genderText)
-                                } else weeklySchedule
-
-                                val days = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
-                                schedule.forEachIndexed { idx, t ->
-                                    Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                                        Text(days.getOrNull(idx) ?: "-", modifier = Modifier.width(50.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(t, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                }
-                            }
-                        }
-                    )
-                }
+                // Daily quest now handled in its dedicated page
 
                 Spacer(modifier = Modifier.height(16.dp))
 
