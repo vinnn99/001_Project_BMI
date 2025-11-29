@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 import android.util.Log
 
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
-    private val repo = HistoryRepository()
+    private val repo = HistoryRepository(application.applicationContext)
 
     val history = repo.historyFlow().stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 

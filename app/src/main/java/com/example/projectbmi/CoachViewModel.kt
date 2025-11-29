@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import android.util.Log
 
-class CoachViewModel(private val repo: AIRepository = AIRepository()) : ViewModel() {
+class CoachViewModel(private val repo: AIRepository = AIRepository) : ViewModel() {
     private val _tips = MutableStateFlow<List<String>>(emptyList())
     val tips: StateFlow<List<String>> = _tips
 

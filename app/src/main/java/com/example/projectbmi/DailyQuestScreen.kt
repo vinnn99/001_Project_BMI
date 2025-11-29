@@ -33,6 +33,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import com.google.gson.Gson
+import com.example.projectbmi.model.QuestTask
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +53,7 @@ fun DailyQuestScreen(navController: NavController) {
     val prefs = context.getSharedPreferences("bmi_prefs", Context.MODE_PRIVATE)
 
     val loading = remember { mutableStateOf(false) }
-    val schedule = remember { mutableStateOf<List<String>>(emptyList()) }
+    val schedule = remember { mutableStateOf<List<QuestTask>>(emptyList()) }
     val completed = remember { mutableStateOf(mutableSetOf<Int>()) }
     val scope = rememberCoroutineScope()
 
@@ -59,8 +61,21 @@ fun DailyQuestScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         loading.value = true
         try {
-            val saved = prefs.getString("weekly_schedule", "") ?: ""
-            schedule.value = if (saved.isBlank()) emptyList() else saved.split("||")
+            val json = prefs.getString("weekly_schedule_json", "") ?: ""
+            schedule.value = if (json.isBlank()) {
+                // fallback to old string format
+                val saved = prefs.getString("weekly_schedule", "") ?: ""
+                if (saved.isBlank()) emptyList() else saved.split("||").mapIndexed { idx, s ->
+                    val days = listOf("SUN","MON","TUE","WED","THU","FRI","SAT")
+                    QuestTask(day = days.getOrNull(idx) ?: "", task = s)
+                }
+            } else {
+                try {
+                    Gson().fromJson(json, Array<QuestTask>::class.java).toList()
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            }
             val compStr = prefs.getString("daily_completed", "") ?: ""
             if (compStr.isNotBlank()) {
                 completed.value.clear()
@@ -71,9 +86,10 @@ fun DailyQuestScreen(navController: NavController) {
         loading.value = false
     }
 
-    fun persistSchedule(list: List<String>) {
+    fun persistSchedule(list: List<QuestTask>) {
         try {
-            prefs.edit().putString("weekly_schedule", list.joinToString("||")).apply()
+            val json = Gson().toJson(list)
+            prefs.edit().putString("weekly_schedule_json", json).apply()
         } catch (_: Exception) {}
     }
 
@@ -145,10 +161,10 @@ fun DailyQuestScreen(navController: NavController) {
                                     persistCompleted()
                                 })
                                 Spacer(modifier = Modifier.size(8.dp))
-                                Column(modifier = Modifier
+                                    Column(modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(start = 12.dp)) {
-                                    Text(task, color = Color(0xFF333333),
+                                    Text(task.task, color = Color(0xFF333333),
                                         textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None
                                     )
                                 }
@@ -169,9 +185,11 @@ fun DailyQuestScreen(navController: NavController) {
                             val bmi = prefs.getString("last_bmi", "0.0")?.toFloatOrNull() ?: 0f
                             val category = prefs.getString("last_category", "") ?: ""
                             val gender = prefs.getString("last_gender", "Male") ?: "Male"
-                            val generated = AIRepository().generateWeeklySchedule(bmi, category, gender)
-                            schedule.value = generated
-                            persistSchedule(generated)
+                                    val generatedStrings = AIRepository.generateWeeklySchedule(bmi, category, gender)
+                                    val days = listOf("SUN","MON","TUE","WED","THU","FRI","SAT")
+                                    val generated = generatedStrings.mapIndexed { idx, s -> QuestTask(day = days.getOrNull(idx) ?: "", task = s) }
+                                    schedule.value = generated
+                                    persistSchedule(generated)
                             completed.value.clear()
                             persistCompleted()
                         } catch (_: Exception) {}
@@ -183,10 +201,10 @@ fun DailyQuestScreen(navController: NavController) {
 
                 Button(onClick = {
                     // Clear saved schedule and completions
-                    scope.launch {
+                        scope.launch {
                         schedule.value = emptyList()
                         completed.value.clear()
-                        try { prefs.edit().remove("weekly_schedule").remove("daily_completed").apply() } catch (_: Exception) {}
+                        try { prefs.edit().remove("weekly_schedule_json").remove("daily_completed").apply() } catch (_: Exception) {}
                     }
                 }) {
                     Text("Clear")
@@ -201,7 +219,7 @@ fun DailyQuestScreen(navController: NavController) {
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEDD5))) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Today's Goal", color = Color(0xFF5D4037))
-                    Text(today ?: "No task for today. Generate schedule to get started.", color = Color(0xFF5D4037))
+                    Text(today?.task ?: "No task for today. Generate schedule to get started.", color = Color(0xFF5D4037))
                 }
             }
         }

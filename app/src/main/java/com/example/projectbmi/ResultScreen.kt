@@ -9,10 +9,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 
 import androidx.compose.foundation.BorderStroke
@@ -105,7 +105,7 @@ fun ResultScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            Icons.Filled.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = Color(0xFF5A4AE3)
                         )
@@ -230,7 +230,7 @@ fun ResultScreen(
                         text = "Ask AI",
                         modifier = Modifier.weight(1f).height(50.dp),
                         gradient = btnGradient,
-                        onClick = { navController.navigate("chat/$categoryText") }
+                        onClick = { navController.navigate("askAI") }
                     )
 
                     // Recalculate Button
@@ -394,7 +394,7 @@ fun ResultScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ArrowForward,
+                                        imageVector = Icons.AutoMirrored.Default.ArrowForward,
                                         contentDescription = "View schedule",
                                         tint = Color.White,
                                         modifier = Modifier.size(24.dp)

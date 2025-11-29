@@ -128,6 +128,22 @@ fun BMIMobileApp() {
         composable("dailyquest") {
             DailyQuestScreen(navController)
         }
+        composable("askAI") {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            AskAIScreenClean(
+                navController = navController,
+                onSaveSchedule = { schedule ->
+                    try {
+                        val prefs = context.getSharedPreferences("daily_quest_prefs", android.content.Context.MODE_PRIVATE)
+                        val gson = com.google.gson.Gson()
+                        val json = gson.toJson(schedule)
+                        prefs.edit().putString("weekly_schedule_json", json).apply()
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "Failed to save schedule", e)
+                    }
+                }
+            )
+        }
         composable(
             route = "chat/{context}",
             arguments = listOf(navArgument("context") { type = NavType.StringType })
