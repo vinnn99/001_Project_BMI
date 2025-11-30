@@ -13,7 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.projectbmi.model.DailyQuestParams
 import com.example.projectbmi.model.QuestTask
@@ -35,7 +37,7 @@ fun AskAIScreenClean(
             IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
         })
     }) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             LinearProgressIndicator(progress = (state.currentStep - 1) / 6f, modifier = Modifier.fillMaxWidth())
 
             Box(modifier = Modifier.weight(1f)) {
@@ -91,80 +93,127 @@ fun AskAIScreenClean(
     }
 }
 
-// Reuse small helper components from AskAIScreen; keep names unique here to avoid collisions if old file remains.
+// Reusable question composables to ensure consistent spacing and protect against large font scales
+@Composable
+fun QuestionStepRadio(
+    title: String,
+    options: List<Pair<String, String>>,
+    selectedValue: String?,
+    onSelect: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .padding(bottom = 8.dp),
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            options.forEach { (label, value) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(selected = selectedValue == value, onClick = { onSelect(value) })
+                        .heightIn(min = 56.dp)
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = selectedValue == value, onClick = { onSelect(value) })
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(label, fontSize = 16.sp, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuestionStepCheckbox(
+    title: String,
+    options: List<String>,
+    selected: List<String>,
+    onToggle: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .padding(bottom = 8.dp),
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            options.forEach { label ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onToggle(label) }
+                        .heightIn(min = 56.dp)
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = selected.contains(label), onCheckedChange = { onToggle(label) })
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(label, fontSize = 16.sp, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun StepPrimaryGoal(state: UserDiscoveryState, onStateChange: (UserDiscoveryState) -> Unit) {
     val options = listOf("Lose weight" to "weight-loss", "Gain weight" to "gain", "Maintain ideal weight" to "maintain", "Check BMI status" to "check")
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        options.forEach { (label, value) ->
-            Row(modifier = Modifier.fillMaxWidth().selectable(selected = state.primaryGoal == value, onClick = { onStateChange(state.copy(primaryGoal = value)) }).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = state.primaryGoal == value, onClick = { onStateChange(state.copy(primaryGoal = value)) })
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(label)
-            }
-        }
+    QuestionStepRadio(title = "What is your primary goal for using this app?", options = options, selectedValue = state.primaryGoal) { value ->
+        onStateChange(state.copy(primaryGoal = value))
     }
 }
 
 @Composable
 fun StepExerciseFrequency(state: UserDiscoveryState, onStateChange: (UserDiscoveryState) -> Unit) {
     val options = listOf("Never" to "never", "1 - 2 times" to "one-two", "3 - 5 times" to "three-five", "Daily" to "daily")
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        options.forEach { (label, value) ->
-            Row(modifier = Modifier.fillMaxWidth().selectable(selected = state.exerciseFrequency == value, onClick = { onStateChange(state.copy(exerciseFrequency = value)) }).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = state.exerciseFrequency == value, onClick = { onStateChange(state.copy(exerciseFrequency = value)) })
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(label)
-            }
-        }
+    QuestionStepRadio(title = "How often do you exercise per week?", options = options, selectedValue = state.exerciseFrequency) { value ->
+        onStateChange(state.copy(exerciseFrequency = value))
     }
 }
 
 @Composable
 fun StepEatingPattern(state: UserDiscoveryState, onStateChange: (UserDiscoveryState) -> Unit) {
     val options = listOf("Irregular" to "irregular", "Overeating" to "overeating", "Balanced" to "balanced", "Specific diet" to "specific")
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        options.forEach { (label, value) ->
-            Row(modifier = Modifier.fillMaxWidth().selectable(selected = state.eatingPattern == value, onClick = { onStateChange(state.copy(eatingPattern = value)) }).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = state.eatingPattern == value, onClick = { onStateChange(state.copy(eatingPattern = value)) })
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(label)
-            }
-        }
+    QuestionStepRadio(title = "What is your typical eating pattern?", options = options, selectedValue = state.eatingPattern) { value ->
+        onStateChange(state.copy(eatingPattern = value))
     }
 }
 
 @Composable
 fun StepSleepHours(state: UserDiscoveryState, onStateChange: (UserDiscoveryState) -> Unit) {
     val options = listOf("< 5 hours" to "less-5", "5-7" to "5-7", "7-9" to "7-9", "> 9" to "more-9")
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        options.forEach { (label, value) ->
-            Row(modifier = Modifier.fillMaxWidth().selectable(selected = state.sleepHours == value, onClick = { onStateChange(state.copy(sleepHours = value)) }).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = state.sleepHours == value, onClick = { onStateChange(state.copy(sleepHours = value)) })
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(label)
-            }
-        }
+    QuestionStepRadio(title = "How many hours do you usually sleep per night?", options = options, selectedValue = state.sleepHours) { value ->
+        onStateChange(state.copy(sleepHours = value))
     }
 }
 
 @Composable
 fun StepChallenges(state: UserDiscoveryState, onStateChange: (UserDiscoveryState) -> Unit) {
     val options = listOf("Finding time", "Diet pattern", "Lack of motivation", "Busy schedule", "Other")
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        options.forEach { label ->
-            Row(modifier = Modifier.fillMaxWidth().clickable {
-                val new = if (state.challenges.contains(label)) state.challenges - label else state.challenges + label
-                onStateChange(state.copy(challenges = new))
-            }.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = state.challenges.contains(label), onCheckedChange = { checked ->
-                    val new = if (checked) state.challenges + label else state.challenges - label
-                    onStateChange(state.copy(challenges = new))
-                })
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(label)
-            }
-        }
+    QuestionStepCheckbox(title = "What do you find most challenging about maintaining your ideal weight?", options = options, selected = state.challenges) { toggled ->
+        val new = if (state.challenges.contains(toggled)) state.challenges - toggled else state.challenges + toggled
+        onStateChange(state.copy(challenges = new))
     }
 }
 

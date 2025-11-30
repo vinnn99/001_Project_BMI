@@ -13,7 +13,8 @@ import kotlinx.coroutines.delay
 fun SplashScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         delay(2000) // tampil 2 detik
-        navController.navigate("onboarding") {
+        // After splash go straight to BMI calculator (skip home/onboarding)
+        navController.navigate("calculator") {
             popUpTo("splash") { inclusive = true }
         }
     }

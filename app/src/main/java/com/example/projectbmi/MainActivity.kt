@@ -107,10 +107,7 @@ fun BMIMobileApp() {
     NavHost(navController = navController, startDestination = "splash") {
         composable("splash") { SplashScreen(navController) }
         composable("onboarding") { OnboardingScreen(navController) }
-        composable("home") {
-            val historyViewModel: com.example.projectbmi.HistoryViewModel = viewModel()
-            HomeScreen(navController, historyViewModel)
-        }
+        // `home` route removed — app now navigates to calculator directly from splash
         composable("calculator") { BMICalculatorScreen(navController) }
         composable("result/{bmi}/{category}/{gender}") { backStackEntry ->
             val bmi = backStackEntry.arguments?.getString("bmi") ?: "0.0"
