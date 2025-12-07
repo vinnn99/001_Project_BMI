@@ -182,7 +182,7 @@ class HistoryRepository(private val context: Context) {
             Log.d("HistoryRepository", "Record added successfully")
         } catch (e: Exception) {
             Log.e("HistoryRepository", "Error adding record", e)
-            throw e
+            // Don't throw - allow app to continue even if Firestore fails
         }
     }
 }

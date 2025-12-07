@@ -25,8 +25,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
 import android.content.Intent
 import android.content.Context
 import android.widget.Toast
@@ -43,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavController
@@ -56,7 +61,9 @@ fun ResultScreen(
     category: String,
     gender: String
 ) {
-    val bmiValue = bmi.toDoubleOrNull() ?: 0.0
+    // Parse BMI safely - handle both . and , as decimal separator
+    val bmiValue = bmi.replace(",", ".").toDoubleOrNull() ?: 0.0
+    android.util.Log.d("ResultScreen", "BMI param: '$bmi', parsed value: $bmiValue")
     val categoryText = category.replace("%20", " ")
     val genderText = gender.replace("%20", " ")
     val drawableResId = getDrawableForCategoryAndGender(categoryText, genderText)
@@ -89,7 +96,16 @@ fun ResultScreen(
 
     // Simple entry animation flags
     var startAnim by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { startAnim = true }
+    LaunchedEffect(Unit) { 
+        startAnim = true 
+        
+        // Auto-save BMI data to SharedPreferences when Result screen loads
+        prefs?.edit()
+            ?.putString("last_bmi", String.format("%.1f", bmiValue))
+            ?.putString("last_category", categoryText)
+            ?.putString("last_gender", genderText)
+            ?.apply()
+    }
     val scaleAnim by animateFloatAsState(targetValue = if (startAnim) 1f else 0.85f, animationSpec = tween(durationMillis = 600))
 
     Scaffold(
@@ -234,14 +250,14 @@ fun ResultScreen(
                     )
 
                     // Recalculate Button
-                    SecondaryActionButton(
-                        text = "Recalculate",
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        onClick = {
-                            navController.navigate("calculator") {
-                                popUpTo("result/{bmi}/{category}/{gender}") { inclusive = true }
+                        SecondaryActionButton(
+                            text = "Recalculate",
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            onClick = {
+                                navController.navigate("calculator?quick=true") {
+                                    popUpTo("result/{bmi}/{category}/{gender}") { inclusive = true }
+                                }
                             }
-                        }
                     )
 
                     // History Button
@@ -278,22 +294,107 @@ fun ResultScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // BMI Range Indicator
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFFEEEEEE))
-                        ) {
-                            Row(modifier = Modifier.fillMaxSize()) {
-                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFF4A90E2)))
-                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFF2F9E44)))
-                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFFFFA500)))
-                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFFEE5A6F)))
+                            // BMI Range Indicator with Position Marker
+                            var barWidthPx by remember { mutableStateOf(0f) }
+                            val indicatorSize = 20.dp
+
+                            Box(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                // Range bar
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(12.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFEEEEEE))
+                                        .onGloballyPositioned { barWidthPx = it.size.width.toFloat() }
+                                ) {
+                                    Row(modifier = Modifier.fillMaxSize()) {
+                                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFF4A90E2)))
+                                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFF2F9E44)))
+                                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFFFFA500)))
+                                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFFEE5A6F)))
+                                    }
+                                }
+                                
+                            // Calculate indicator position based on BMI value
+                            // BMI ranges: <18.5 (Underweight), 18.5-24.9 (Normal), 25-29.9 (Overweight), ≥30 (Obese)
+                            // Map BMI to position on bar (0.0 to 1.0)
+                            val indicatorPosition = remember(bmiValue) {
+                                when {
+                                    bmiValue < 18.5f -> {
+                                        // Map 10-18.5 to 0.0-0.25 (first quarter)
+                                        val normalized = ((bmiValue - 10.0) / 8.5).coerceIn(0.0, 1.0).toFloat()
+                                        normalized * 0.25f
+                                    }
+                                    bmiValue < 25f -> {
+                                        // Map 18.5-25 to 0.25-0.5 (second quarter)
+                                        val normalized = ((bmiValue - 18.5) / 6.5).coerceIn(0.0, 1.0).toFloat()
+                                        0.25f + normalized * 0.25f
+                                    }
+                                    bmiValue < 30f -> {
+                                        // Map 25-30 to 0.5-0.75 (third quarter)
+                                        val normalized = ((bmiValue - 25.0) / 5.0).coerceIn(0.0, 1.0).toFloat()
+                                        0.5f + normalized * 0.25f
+                                    }
+                                    else -> {
+                                        // Map 30-40+ to 0.75-1.0 (fourth quarter)
+                                        val normalized = ((bmiValue - 30.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
+                                        0.75f + normalized * 0.25f
+                                    }
+                                }
+                            }
+                            
+                            // Animated indicator position
+                            val animatedPosition by animateFloatAsState(
+                                targetValue = if (startAnim) indicatorPosition else 0.5f,
+                                animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+                                label = "indicator_position"
+                            )
+                            
+                            // Position indicator dot (use measured bar width so it stays inside)
+                            val density = LocalDensity.current
+                            val indicatorOffsetDp = remember(barWidthPx, animatedPosition, density) {
+                                if (barWidthPx > 0f) {
+                                    val indicatorPx = with(density) { indicatorSize.toPx() }
+                                    val clamped = (animatedPosition.coerceIn(0f, 1f) * barWidthPx - indicatorPx / 2f)
+                                        .coerceIn(0f, barWidthPx - indicatorPx)
+                                    (clamped / density.density).dp
+                                } else 0.dp
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .wrapContentWidth(Alignment.Start)
+                                    .offset(x = indicatorOffsetDp)
+                                    .zIndex(2f)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    // Indicator dot with shadow and pulse effect
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .offset(y = (-6).dp)
+                                            .shadow(10.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.25f))
+                                            .background(Color.White, CircleShape)
+                                            .border(3.dp, categoryColor, CircleShape)
+                                            .zIndex(2f),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(Color.White, CircleShape)
+                                        )
+                                    }
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("< 18.5", style = MaterialTheme.typography.labelSmall, color = Color(0xFF999999))
                             Text("18.5 - 24.9", style = MaterialTheme.typography.labelSmall, color = Color(0xFF999999))
@@ -403,39 +504,50 @@ fun ResultScreen(
                             }
 
                             val todayIndex = LocalDate.now().dayOfWeek.value % 7
-                            val savedSchedule = try {
-                                prefs?.getString("weekly_schedule", "")?.split("||") ?: emptyList()
-                            } catch (e: Exception) { emptyList<String>() }
-                            val todaysTask = savedSchedule.getOrNull(todayIndex)
+                            val prefs = try {
+                                context.getSharedPreferences("daily_quest_prefs", Context.MODE_PRIVATE)
+                            } catch (e: Exception) { null }
+                            
+                            val todaysTask = try {
+                                val json = prefs?.getString("weekly_schedule_json", "") ?: ""
+                                if (json.isBlank()) {
+                                    null
+                                } else {
+                                    val tasks = com.google.gson.Gson().fromJson(json, Array<com.example.projectbmi.model.QuestTask>::class.java).toList()
+                                    tasks.getOrNull(todayIndex)?.task
+                                }
+                            } catch (e: Exception) { null }
 
-                            // Today's Goal box with subtle gradient
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .shadow(4.dp, shape = RoundedCornerShape(14.dp)),
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color(0xFFFEF3C7),
-                                tonalElevation = 0.dp
-                            ) {
-                                Column(
+                            // Today's Goal box - only show if schedule exists
+                            if (todaysTask != null) {
+                                Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp)
+                                        .shadow(4.dp, shape = RoundedCornerShape(14.dp)),
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = Color(0xFFFEF3C7),
+                                    tonalElevation = 0.dp
                                 ) {
-                                    Text(
-                                        "Today's Goal",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF78350F)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        todaysTask ?: "Generate a schedule to get started",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color(0xFF92400E),
-                                        lineHeight = 20.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp)
+                                    ) {
+                                        Text(
+                                            "Today's Goal",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF78350F)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            todaysTask,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color(0xFF92400E),
+                                            lineHeight = 20.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
 
@@ -479,7 +591,11 @@ fun ResultScreen(
 
                     IconButton(onClick = {
                         val prefs = context.getSharedPreferences("bmi_prefs", Context.MODE_PRIVATE)
-                        prefs.edit().putString("last_bmi", String.format("%.1f", bmiValue)).putString("last_category", categoryText).apply()
+                        prefs.edit()
+                            .putString("last_bmi", String.format("%.1f", bmiValue))
+                            .putString("last_category", categoryText)
+                            .putString("last_gender", genderText)
+                            .apply()
                         try {
                             val rec = com.example.projectbmi.model.BMIRecord(
                                 timestamp = System.currentTimeMillis(),

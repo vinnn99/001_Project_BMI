@@ -18,7 +18,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.example.projectbmi.ui.screens.OnboardingScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projectbmi.HistoryViewModel
 
@@ -106,9 +105,14 @@ fun BMIMobileApp() {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = "splash") {
         composable("splash") { SplashScreen(navController) }
-        composable("onboarding") { OnboardingScreen(navController) }
-        // `home` route removed — app now navigates to calculator directly from splash
-        composable("calculator") { BMICalculatorScreen(navController) }
+        // `onboarding` route removed — app now navigates to calculator directly from splash
+        composable(
+            route = "calculator?quick={quick}",
+            arguments = listOf(navArgument("quick") { type = NavType.BoolType; defaultValue = false })
+        ) { backStackEntry ->
+            val quick = backStackEntry.arguments?.getBoolean("quick") ?: false
+            BMICalculatorScreen(navController, quickRecalc = quick)
+        }
         composable("result/{bmi}/{category}/{gender}") { backStackEntry ->
             val bmi = backStackEntry.arguments?.getString("bmi") ?: "0.0"
             val encodedCategory = backStackEntry.arguments?.getString("category") ?: "Unknown"
@@ -127,14 +131,19 @@ fun BMIMobileApp() {
         }
         composable("askAI") {
             val context = androidx.compose.ui.platform.LocalContext.current
+            // Get BMI category from SharedPreferences
+            val prefs = context.getSharedPreferences("bmi_prefs", android.content.Context.MODE_PRIVATE)
+            val bmiCategory = prefs.getString("last_category", "Normal") ?: "Normal"
+            
             AskAIScreenClean(
                 navController = navController,
+                userBMICategory = bmiCategory,
                 onSaveSchedule = { schedule ->
                     try {
-                        val prefs = context.getSharedPreferences("daily_quest_prefs", android.content.Context.MODE_PRIVATE)
+                        val questPrefs = context.getSharedPreferences("daily_quest_prefs", android.content.Context.MODE_PRIVATE)
                         val gson = com.google.gson.Gson()
                         val json = gson.toJson(schedule)
-                        prefs.edit().putString("weekly_schedule_json", json).apply()
+                        questPrefs.edit().putString("weekly_schedule_json", json).apply()
                     } catch (e: Exception) {
                         android.util.Log.e("MainActivity", "Failed to save schedule", e)
                     }

@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,9 +40,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -50,25 +54,26 @@ import java.time.LocalDate
 @Composable
 fun DailyQuestScreen(navController: NavController) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("bmi_prefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences("daily_quest_prefs", Context.MODE_PRIVATE)
 
     val loading = remember { mutableStateOf(false) }
     val schedule = remember { mutableStateOf<List<QuestTask>>(emptyList()) }
-    val completed = remember { mutableStateOf(mutableSetOf<Int>()) }
+    val completed = remember { mutableStateOf(setOf<Int>()) }
     val scope = rememberCoroutineScope()
 
     // Load saved schedule and completed flags on first composition
     LaunchedEffect(Unit) {
         loading.value = true
         try {
+            // Clear old format data to avoid confusion
+            val hasOldFormat = prefs.contains("weekly_schedule")
+            if (hasOldFormat) {
+                prefs.edit().remove("weekly_schedule").apply()
+            }
+            
             val json = prefs.getString("weekly_schedule_json", "") ?: ""
             schedule.value = if (json.isBlank()) {
-                // fallback to old string format
-                val saved = prefs.getString("weekly_schedule", "") ?: ""
-                if (saved.isBlank()) emptyList() else saved.split("||").mapIndexed { idx, s ->
-                    val days = listOf("SUN","MON","TUE","WED","THU","FRI","SAT")
-                    QuestTask(day = days.getOrNull(idx) ?: "", task = s)
-                }
+                emptyList()
             } else {
                 try {
                     Gson().fromJson(json, Array<QuestTask>::class.java).toList()
@@ -76,10 +81,25 @@ fun DailyQuestScreen(navController: NavController) {
                     emptyList()
                 }
             }
-            val compStr = prefs.getString("daily_completed", "") ?: ""
-            if (compStr.isNotBlank()) {
-                completed.value.clear()
-                compStr.split(",").mapNotNull { it.toIntOrNull() }.forEach { completed.value.add(it) }
+            
+            // Load completed tasks with date check - reset if different day
+            val todayDate = LocalDate.now().toString()
+            val savedDate = prefs.getString("daily_completed_date", "") ?: ""
+            
+            if (todayDate != savedDate) {
+                // Different day - clear old completed tasks
+                prefs.edit()
+                    .remove("daily_completed")
+                    .putString("daily_completed_date", todayDate)
+                    .apply()
+                completed.value = emptySet()
+            } else {
+                // Same day - load saved completed tasks
+                val compStr = prefs.getString("daily_completed", "") ?: ""
+                if (compStr.isNotBlank()) {
+                    val loaded = compStr.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+                    completed.value = loaded
+                }
             }
         } catch (_: Exception) {
         }
@@ -95,8 +115,20 @@ fun DailyQuestScreen(navController: NavController) {
 
     fun persistCompleted() {
         try {
-            prefs.edit().putString("daily_completed", completed.value.joinToString(",")).apply()
+            val completedStr = completed.value.joinToString(",")
+            val todayDate = LocalDate.now().toString()
+            prefs.edit()
+                .putString("daily_completed", completedStr)
+                .putString("daily_completed_date", todayDate)
+                .apply()
         } catch (_: Exception) {}
+    }
+    
+    fun toggleTask(index: Int) {
+        val newSet = completed.value.toMutableSet()
+        if (newSet.contains(index)) newSet.remove(index) else newSet.add(index)
+        completed.value = newSet.toSet()
+        persistCompleted()
     }
 
     Scaffold(
@@ -141,32 +173,66 @@ fun DailyQuestScreen(navController: NavController) {
             Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Color(0xFFF8FAF0)) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     val days = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
+                    val todayIdx = LocalDate.now().dayOfWeek.value % 7
                     if (schedule.value.isEmpty()) {
-                        Text("No schedule yet. Tap Generate to create a personalized weekly plan.", color = Color(0xFF555555))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                "📋 No Weekly Schedule Yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF333333)
+                            )
+                            Text(
+                                "Start your personalized fitness journey by visiting Ask AI to generate your weekly schedule.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF666666),
+                                textAlign = TextAlign.Center
+                            )
+                            Button(
+                                onClick = { navController.navigate("askAI") },
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            ) {
+                                Text("Go to Ask AI →")
+                            }
+                        }
                     } else {
                         schedule.value.forEachIndexed { idx, task ->
                             val isDone = completed.value.contains(idx)
-                            Row(modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
-                                .clickable {
-                                    if (isDone) completed.value.remove(idx) else completed.value.add(idx)
-                                    persistCompleted()
-                                },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(days.getOrNull(idx) ?: "-", modifier = Modifier.size(44.dp), color = Color(0xFF444444))
-                                Checkbox(checked = isDone, onCheckedChange = { checked ->
-                                    if (checked) completed.value.add(idx) else completed.value.remove(idx)
-                                    persistCompleted()
-                                })
-                                Spacer(modifier = Modifier.size(8.dp))
-                                    Column(modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 12.dp)) {
-                                    Text(task.task, color = Color(0xFF333333),
-                                        textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None
+                            val isToday = idx == todayIdx
+                            task?.let { t ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = days.getOrNull(idx) ?: "-",
+                                        modifier = Modifier.size(44.dp),
+                                        color = Color(0xFF444444)
                                     )
+                                    Checkbox(
+                                        checked = isDone,
+                                        onCheckedChange = { _ ->
+                                            toggleTask(idx)
+                                        },
+                                        enabled = isToday
+                                    )
+                                    Spacer(modifier = Modifier.size(8.dp))
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 12.dp)
+                                    ) {
+                                        Text("Task: ${t.task}")
+                                        Text("Duration: ${t.duration} min", fontSize = 12.sp)
+                                    }
                                 }
                             }
                         }
@@ -176,35 +242,19 @@ fun DailyQuestScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.padding(8.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    // Generate using last-known BMI/category/gender if available
-                    scope.launch {
-                        loading.value = true
-                        try {
-                            val bmi = prefs.getString("last_bmi", "0.0")?.toFloatOrNull() ?: 0f
-                            val category = prefs.getString("last_category", "") ?: ""
-                            val gender = prefs.getString("last_gender", "Male") ?: "Male"
-                                    val generatedStrings = AIRepository.generateWeeklySchedule(bmi, category, gender)
-                                    val days = listOf("SUN","MON","TUE","WED","THU","FRI","SAT")
-                                    val generated = generatedStrings.mapIndexed { idx, s -> QuestTask(day = days.getOrNull(idx) ?: "", task = s) }
-                                    schedule.value = generated
-                                    persistSchedule(generated)
-                            completed.value.clear()
-                            persistCompleted()
-                        } catch (_: Exception) {}
-                        loading.value = false
-                    }
-                }) {
-                    Text("Generate")
-                }
-
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Button(onClick = {
                     // Clear saved schedule and completions
-                        scope.launch {
+                    scope.launch {
                         schedule.value = emptyList()
-                        completed.value.clear()
-                        try { prefs.edit().remove("weekly_schedule_json").remove("daily_completed").apply() } catch (_: Exception) {}
+                        completed.value = emptySet()
+                        try { 
+                            prefs.edit()
+                                .remove("weekly_schedule_json")
+                                .remove("daily_completed")
+                                .remove("daily_completed_date")
+                                .apply() 
+                        } catch (_: Exception) {}
                     }
                 }) {
                     Text("Clear")
@@ -213,13 +263,15 @@ fun DailyQuestScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.padding(12.dp))
 
-            // Quick today's task preview
-            val todayIdx = LocalDate.now().dayOfWeek.value % 7
-            val today = schedule.value.getOrNull(todayIdx)
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEDD5))) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Today's Goal", color = Color(0xFF5D4037))
-                    Text(today?.task ?: "No task for today. Generate schedule to get started.", color = Color(0xFF5D4037))
+            // Quick today's task preview - only show if schedule exists
+            if (schedule.value.isNotEmpty()) {
+                val todayIdx = LocalDate.now().dayOfWeek.value % 7
+                val today = schedule.value.getOrNull(todayIdx)
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEDD5))) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("Today's Goal", color = Color(0xFF5D4037))
+                        Text(today?.task ?: "No task for today.", color = Color(0xFF5D4037))
+                    }
                 }
             }
         }

@@ -1,0 +1,7 @@
+# Sample gradle properties (do NOT commit secrets)
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+kotlin.code.style=official
+android.nonTransitiveRClass=true
+# Add your API key locally (do not commit):
+# DEEPSEEK_API_KEY=your_api_key_here
