@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -752,8 +753,10 @@ fun GenderCard(
             Text(
                 text = label,
                 fontSize = 18.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) Color.White else Color(0xFF1F2937)
+                fontWeight = FontWeight.Bold,
+                color = if (selected) Color.White else Color(0xFF000000),
+                maxLines = 1,
+                overflow = TextOverflow.Visible
             )
         }
     }

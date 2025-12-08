@@ -137,7 +137,7 @@ fun ResultScreen(
     ) { padding ->
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .background(Color(0xFFFBFBFB))

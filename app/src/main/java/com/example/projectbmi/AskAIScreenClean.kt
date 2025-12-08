@@ -49,6 +49,10 @@ import com.example.projectbmi.utils.NetworkUtils
 import kotlinx.coroutines.launch
 import android.widget.Toast
 import com.example.projectbmi.questionnaire.*
+import com.example.projectbmi.ui.screens.ModernAISuggestionsSection
+import com.example.projectbmi.ui.screens.ModernChatSection
+import com.example.projectbmi.ui.screens.ModernSummaryScreen
+import com.example.projectbmi.ui.screens.SummaryState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,29 +133,50 @@ fun AskAIScreenClean(
         LaunchedEffect(state.currentStep, aiRequestedForChat) {
             if (state.currentStep == 6 && !aiRequestedForChat) {
                 aiRequestedForChat = true
-                try {
-                    val params = DailyQuestParams(
-                        bmiCategory = state.bmiCategory,
-                        goal = state.primaryGoal ?: "maintain",
-                        intensity = state.exerciseIntensity ?: "medium",
-                        timeAvailable = mapDaysToTime(state.daysAvailable),
-                        daysPerWeek = mapDaysToDaysPerWeek(state.daysAvailable),
-                        focusArea = state.focusArea ?: "mixed",
-                        healthStatus = "healthy",
-                        exerciseHistory = state.experienceLevel ?: "intermediate",
-                        dietaryPreference = "omnivore"
-                    )
-                    aiTips = AIRepository.generateQuickTips(0.0f, state.bmiCategory, "unknown")
-                } catch (_: Exception) {
-                    aiTips = emptyList()
+                scope.launch {
+                    try {
+                        // Save user profile to SharedPreferences for notifications
+                        val prefs = context.getSharedPreferences("user_profile", android.content.Context.MODE_PRIVATE)
+                        val userJson = com.google.gson.Gson().toJson(state)
+                        prefs.edit().putString("user_state", userJson).apply()
+                        
+                        val params = DailyQuestParams(
+                            bmiCategory = state.bmiCategory,
+                            goal = state.primaryGoal ?: "maintain",
+                            intensity = state.exerciseIntensity ?: "medium",
+                            timeAvailable = mapDaysToTime(state.daysAvailable),
+                            daysPerWeek = mapDaysToDaysPerWeek(state.daysAvailable),
+                            focusArea = state.focusArea ?: "mixed",
+                            healthStatus = "healthy",
+                            exerciseHistory = state.experienceLevel ?: "intermediate",
+                            dietaryPreference = "omnivore"
+                        )
+                        // Generate personalized tips based on user's answers
+                        val tipsPrompt = buildString {
+                            append("Based on the user's fitness profile:\n")
+                            append("- Goal: ${state.primaryGoal ?: "maintain fitness"}\n")
+                            append("- Intensity preference: ${state.exerciseIntensity ?: "medium"}\n")
+                            append("- Available days: ${state.daysAvailable ?: "3-4 days"}\n")
+                            append("- Experience level: ${state.experienceLevel ?: "intermediate"}\n")
+                            append("- Focus areas: ${state.focusArea ?: "mixed/balanced"}\n")
+                            append("- BMI category: ${state.bmiCategory}\n")
+                            append("\nProvide 3-4 personalized workout tips that match their profile (keep each tip short, 1-2 sentences)")
+                        }
+                        
+                        // Generate default tips based on profile
+                        aiTips = generateDefaultTips(state)
+                    } catch (_: Exception) {
+                        aiTips = emptyList()
+                    }
                 }
             }
         }
 
         // When showing preview or questionnaire (steps 1-5), don't use verticalScroll
-        // LazyColumn can't be nested in scrollable parent
+        // Avoid nested scroll: summary screen (step 7) already scrolls internally
         val isQuestionnaire = state.currentStep in 1..5
-        val useScroll = generated == null && !isQuestionnaire
+        val isSummary = state.currentStep == 7
+        val useScroll = generated == null && !isQuestionnaire && !isSummary
         
         Column(
             modifier = Modifier
@@ -176,8 +201,16 @@ fun AskAIScreenClean(
                             maxRegenerations = maxRegenerations,
                             onSave = {
                                 onSaveSchedule(generated!!)
+                                
+                                // Schedule alarm for daily 6 AM reminder
+                                try {
+                                    AlarmHelper.scheduleWorkoutReminder(context)
+                                    android.util.Log.d("AskAI", "Alarm scheduled for daily reminders")
+                                } catch (e: Exception) {
+                                    android.util.Log.e("AskAI", "Error scheduling alarm: ${e.message}", e)
+                                }
                             
-                            // Clear schedule history after save
+                                // Clear schedule history after save
                             generatedSchedulesHistory.clear()
                             usedPoolIndices.clear()
                             regenerateCount = 0
@@ -312,233 +345,111 @@ fun AskAIScreenClean(
                         2 -> state.exerciseIntensity?.let { setOf(it) } ?: emptySet()
                         3 -> state.daysAvailable?.let { setOf(it) } ?: emptySet()
                         4 -> state.experienceLevel?.let { setOf(it) } ?: emptySet()
-                        5 -> state.focusArea?.let { setOf(it) } ?: emptySet()  // Focus area (can be multi-select later)
+                        5 -> state.focusArea?.split(",")?.toSet() ?: emptySet()  // Multi-select: comma-separated string
                         else -> emptySet()
                     }
                     
-                    // Clean auto-advance pattern - no Next button needed
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // Multi-select needs manual advance with floating action button
-                        if (currentScreen.isMultiSelect) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                QuestionnaireScreen(
-                                    screen = currentScreen,
-                                    selectedOptions = selectedOptions,
-                                    onSelectionChange = { value ->
-                                        // For multi-select focus area, toggle selection
-                                        state = if (value == state.focusArea) {
-                                            state.copy(focusArea = null)
-                                        } else {
-                                            state.copy(focusArea = value)
-                                        }
-                                    },
-                                    progress = state.currentStep / 5f
-                                )
-                                
-                                // Floating Next button for multi-select
-                                if (state.focusArea != null) {
-                                    FloatingActionButton(
-                                        onClick = {
-                                            state = state.copy(currentStep = 6)
-                                        },
-                                        modifier = Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .padding(24.dp),
-                                        containerColor = Color(0xFF6366F1)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowForward,
-                                            contentDescription = "Next",
-                                            tint = Color.White
-                                        )
+                    // Use enhanced questionnaire screen
+                    EnhancedQuestionnaireScreen(
+                        screen = currentScreen,
+                        stepNumber = state.currentStep,
+                        totalSteps = 5,
+                        selectedOptions = selectedOptions,
+                        onSelectionChange = { value ->
+                            // Update state based on questionnaire step
+                            state = when (state.currentStep) {
+                                1 -> state.copy(primaryGoal = value)  // Fitness goal
+                                2 -> state.copy(exerciseIntensity = value)  // Intensity level
+                                3 -> state.copy(daysAvailable = value)  // Days per week
+                                4 -> state.copy(experienceLevel = value)  // Experience level
+                                5 -> {
+                                    // Multi-select: toggle add/remove (comma-separated)
+                                    val currentSet = state.focusArea?.split(",")?.toMutableSet() ?: mutableSetOf()
+                                    if (value in currentSet) {
+                                        currentSet.remove(value)
+                                    } else {
+                                        currentSet.add(value)
                                     }
+                                    val newFocusArea = if (currentSet.isEmpty()) null else currentSet.joinToString(",")
+                                    state.copy(focusArea = newFocusArea)
+                                }
+                                else -> state
+                            }
+                            
+                            // Auto-advance after 800ms for single-select (steps 1-4)
+                            if (state.currentStep < 5) {
+                                scope.launch {
+                                    kotlinx.coroutines.delay(800)
+                                    state = state.copy(currentStep = state.currentStep + 1)
                                 }
                             }
-                        } else {
-                            // Single-select with auto-advance
-                            QuestionnaireScreen(
-                                screen = currentScreen,
-                                selectedOptions = selectedOptions,
-                                onSelectionChange = { value ->
-                                    // Update state based on questionnaire step
-                                    state = when (state.currentStep) {
-                                        1 -> state.copy(primaryGoal = value)  // Fitness goal
-                                        2 -> state.copy(exerciseIntensity = value)  // Intensity level
-                                        3 -> state.copy(daysAvailable = value)  // Days per week
-                                        4 -> state.copy(experienceLevel = value)  // Experience level
-                                        else -> state
-                                    }
-                                    // Auto-advance after 800ms
-                                    scope.launch {
-                                        kotlinx.coroutines.delay(800)
-                                        state = state.copy(currentStep = state.currentStep + 1)
-                                    }
-                                },
-                                progress = state.currentStep / 5f
-                            )
-                        }
-                    }
+                        },
+                        onNextClick = {
+                            // Manual advance for multi-select (step 5) or end of questionnaire
+                            if (state.currentStep < 5) {
+                                state = state.copy(currentStep = state.currentStep + 1)
+                            } else {
+                                // Last step - show AI tips/chat
+                                state = state.copy(currentStep = 6)
+                            }
+                        },
+                        progress = state.currentStep / 5f
+                    )
                 }
 
                 state.currentStep == 6 -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // Modern AI Suggestions Section
+                        ModernAISuggestionsSection(tips = aiTips)
 
-                    // Top cards: AI Suggestions & Follow-ups
-                    if (aiTips.isNotEmpty()) {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("AI Suggestions", fontWeight = FontWeight.Bold)
-                                aiTips.forEach { t -> Text("• $t") }
-                            }
-                        }
-                    }
-
-                    // Chat area: messages list (fixed-height) + input row
-                    val chatMessages = remember { mutableStateListOf<Pair<String, String>>() }
-                    var chatInput by remember { mutableStateOf("") }
-                    var isAITyping by remember { mutableStateOf(false) }
-                    val chatScrollState = rememberScrollState()
-
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Chat with AI", fontWeight = FontWeight.SemiBold)
-                            
-                            Box(modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 180.dp, max = 280.dp)
-                                .border(1.dp, MaterialTheme.colorScheme.outline)
-                                .background(MaterialTheme.colorScheme.surface)
-                                .verticalScroll(chatScrollState)
-                            ) {
-                                if (chatMessages.isEmpty() && !isAITyping) {
-                                    Text("Start the conversation by typing below.", modifier = Modifier.padding(12.dp).align(Alignment.TopStart))
-                                } else {
-                                    Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        chatMessages.forEach { msg ->
-                                            val role = msg.first
-                                            val text = msg.second
-                                            
-                                            // Check if message is an error message
-                                            if (role == "error") {
-                                                // Error message styling
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(MaterialTheme.colorScheme.errorContainer, MaterialTheme.shapes.medium)
-                                                        .padding(12.dp)
-                                                ) {
-                                                    Text(
-                                                        text = text,
-                                                        color = MaterialTheme.colorScheme.onErrorContainer,
-                                                        fontSize = 14.sp
-                                                    )
-                                                }
-                                            } else if (role == "user") {
-                                                UserChatBubble(text)
-                                            } else {
-                                                AIChatBubble(text)
-                                            }
-                                        }
-                                        if (isAITyping) {
-                                            AITypingIndicator()
-                                        }
+                        // Modern Chat Section
+                        ModernChatSection(
+                            onSendMessage = { messageCopy ->
+                                try {
+                                    if (!NetworkUtils.isInternetAvailable(context)) {
+                                        return@ModernChatSection "❌ No internet connection. Please check your network."
                                     }
-                                }
-                            }
 
-                            // Input row: TextField + Send
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                OutlinedTextField(
-                                    value = chatInput,
-                                    onValueChange = { chatInput = it },
-                                    placeholder = { Text("Ask AI... type a question") },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true,
-                                    enabled = !isAITyping
-                                )
-                                Button(
-                                    onClick = {
-                                        if (chatInput.isNotBlank()) {
-                                            // Check network before sending
-                                            if (!NetworkUtils.isInternetAvailable(context)) {
-                                                chatMessages.add(Pair("error", "❌ No internet connection. Please check your network."))
-                                                return@Button
-                                            }
-                                            
-                                            val messageCopy = chatInput.trim()
-                                            chatMessages.add(Pair("user", messageCopy))
-                                            chatInput = ""
-                                            isAITyping = true
-                                            scope.launch {
-                                                try {
-                                                    // Read current BMI data from SharedPreferences
-                                                    val prefs = context.getSharedPreferences("bmi_prefs", android.content.Context.MODE_PRIVATE)
-                                                    val currentBmi = prefs?.getString("last_bmi", "Not recorded") ?: "Not recorded"
-                                                    val currentCategory = prefs?.getString("last_category", "Unknown") ?: "Unknown"
-                                                    
-                                                    // Build comprehensive user profile context with all discovery answers AND BMI data
-                                                    val contextProfile = """
-User Discovery Profile:
+                                    // Read current BMI data from SharedPreferences
+                                    val prefs = context.getSharedPreferences("bmi_prefs", android.content.Context.MODE_PRIVATE)
+                                    val currentBmi = prefs?.getString("last_bmi", "Not recorded") ?: "Not recorded"
+                                    val currentCategory = prefs?.getString("last_category", "Unknown") ?: "Unknown"
+
+                                    // Build comprehensive user profile context with all discovery answers AND BMI data
+                                    val contextProfile = """
+User Fitness Profile (From Enhanced Questionnaire):
 - Primary Goal: ${state.primaryGoal ?: "Not specified"}
-- Exercise Frequency: ${state.exerciseFrequency ?: "Not specified"}
-- Dietary Preferences: ${state.eatingPattern ?: "Not specified"}
-- Sleep Hours: ${state.sleepHours ?: "Not specified"}
-- Health Challenges: ${state.challenges.joinToString(", ") { it }}
+- Exercise Intensity: ${state.exerciseIntensity ?: "Not specified"}
+- Days Available Per Week: ${state.daysAvailable ?: "Not specified"}
+- Experience Level: ${state.experienceLevel ?: "Not specified"}
+- Focus Areas: ${state.focusArea ?: "Not specified"}
 - BMI Category: ${state.bmiCategory}
 
 Current Health Metrics:
 - Current BMI: $currentBmi
 - BMI Category: $currentCategory
 
-Context: You are a personalized fitness and health coach. Use the above profile and health metrics to give specific, actionable advice. When user asks about their progress, compare their current metrics to their goals.
-                                                    """.trimIndent()
-                                                    val reply = DeepseekRepository.sendMessage(messageCopy, contextProfile)
-                                                    isAITyping = false
-                                                    
-                                                    // Check if response is an error message
-                                                    if (reply.startsWith("❌") || reply.startsWith("⏱️") || reply.startsWith("⚠️")) {
-                                                        chatMessages.add(Pair("error", reply))
-                                                    } else {
-                                                        chatMessages.add(Pair("ai", reply))
-                                                    }
-                                                } catch (e: Exception) {
-                                                    isAITyping = false
-                                                    chatMessages.add(Pair("error", "⚠️ Error: ${e.localizedMessage ?: "AI failed to respond"}"))
-                                                }
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.height(56.dp),
-                                    enabled = !isAITyping
-                                ) {
-                                    Text(if (isAITyping) "Sending..." else "Send")
+Context: You are a personalized fitness and health coach. Use the above profile and health metrics to give specific, actionable advice tailored to their goals, intensity preference, available days, experience level, and focus areas. When user asks about their progress, compare their current metrics to their fitness goals.
+                                    """.trimIndent()
+                                    return@ModernChatSection DeepseekRepository.sendMessage(messageCopy, contextProfile)
+                                } catch (e: Exception) {
+                                    return@ModernChatSection "⚠️ Error: ${e.localizedMessage ?: "AI failed to respond"}"
                                 }
-                            }
-                        }
-                    }
+                            },
+                            onGenerateSummary = {
+                                // Generate summary in background coroutine
+                                isGeneratingSummary = true
+                                scope.launch {
+                                    try {
+                                        // Check internet connection first
+                                        if (!NetworkUtils.isInternetAvailable(context)) {
+                                            aiSummary = "⚠️ No internet connection. Please check your network."
+                                            android.util.Log.e("AskAI", "No internet for summary generation")
+                                            return@launch
+                                        }
 
-                    // Primary full-width action - Generate Summary with quick advance
-                    Button(onClick = {
-                        // Validate that user has chatted with AI first
-                        if (chatMessages.isEmpty()) {
-                            Toast.makeText(context, "Please chat with AI first before generating summary", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        
-                        isGeneratingSummary = true
-                        scope.launch {
-                            try {
-                                // Build comprehensive context including chat conversation
-                                val chatHistory = chatMessages
-                                    .filter { it.first != "error" }
-                                    .joinToString("\n") { (role, text) ->
-                                        "${if (role == "user") "User" else "Coach"}: $text"
-                                    }
-                                
-                                // Get user's progress stats from stored schedule
-                                val progressStats = getProgressStats(context, generated ?: emptyList())
-                                
-                                val summaryPrompt = """
-Based on the user's profile and our conversation, create a personalized fitness and wellness summary:
+                                        val summaryPrompt = """
+Based on the user's profile, create a personalized fitness and wellness summary:
 
 User Discovery Profile:
 - Primary Goal: ${state.primaryGoal ?: "Not specified"}
@@ -548,61 +459,56 @@ User Discovery Profile:
 - Focus Area: ${state.focusArea ?: "Not specified"}
 - BMI Category: ${state.bmiCategory}
 
-User Progress:
-- Current Schedule: ${if ((generated ?: emptyList()).isNotEmpty()) "${(generated ?: emptyList()).size} days planned" else "No schedule yet"}
-- Tasks Completed: ${progressStats["completedCount"] ?: 0} out of ${progressStats["totalCount"] ?: 0}
-- Completion Rate: ${progressStats["completionRate"] ?: "N/A"}%
-- Consistency: ${progressStats["consistency"] ?: "Just started"}
-- Last Updated: ${progressStats["lastUpdated"] ?: "Today"}
-
-Conversation History:
-$chatHistory
-
 Please provide:
-1. A personalized wellness summary acknowledging their current progress
-2. 3-5 key action items tailored to their specific situation (consider their progress history)
-3. A motivational message based on their consistency and effort
+1. A personalized wellness summary
+2. 3-5 key action items tailored to their specific situation
+3. A motivational message
 4. Next steps to build on their momentum
 
-Keep the summary concise but comprehensive, and reference their actual progress where relevant.
-                                """.trimIndent()
-                                
-                                aiSummary = DeepseekRepository.sendMessage(summaryPrompt, "")
-                                // Auto-advance to next step after generating summary
-                                state = state.copy(currentStep = 7)
-                            } catch (e: Exception) {
-                                aiSummary = "⚠️ Could not generate summary: ${e.localizedMessage ?: "Try again"}"
-                            } finally {
-                                isGeneratingSummary = false
+Keep the summary concise but comprehensive.
+                                        """.trimIndent()
+
+                                        android.util.Log.d("AskAI", "Starting summary generation...")
+                                        val result = DeepseekRepository.sendMessage(summaryPrompt, "")
+                                        android.util.Log.d("AskAI", "Summary generated successfully: ${result.take(50)}...")
+                                        aiSummary = result
+                                        // Auto-advance to next step after generating summary
+                                        state = state.copy(currentStep = 7)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("AskAI", "Summary generation error: ${e.message}", e)
+                                        aiSummary = "⚠️ Could not generate summary: ${e.message ?: "Unknown error"}"
+                                    } finally {
+                                        isGeneratingSummary = false
+                                    }
+                                }
                             }
-                        }
-                    }, modifier = Modifier.fillMaxWidth(), enabled = !isGeneratingSummary) {
-                        if (isGeneratingSummary) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                                Text("Generating...")
-                            }
-                        } else {
-                            Text("Generate Summary")
-                        }
+                        )
                     }
                 }
 
                 state.currentStep == 7 -> {
-                    SummaryStep(state = state, aiSummary = aiSummary, isLoading = state.isLoading, onGenerate = {
-                        // Only generate if we haven't generated yet in this session
-                        if (hasGeneratedOnce) {
-                            android.util.Log.d("AskAI", "Schedule already generated in this session, skipping regeneration")
-                            Toast.makeText(context, "Schedule already generated. Click Regenerate to create a new one or Save to finish.", Toast.LENGTH_SHORT).show()
-                            return@SummaryStep
-                        }
-                        
-                        android.util.Log.d("AskAI", "Generate button clicked at step 7")
-                        state = state.copy(isLoading = true)
-                        scope.launch {
-                            try {
-                                val params = DailyQuestParams(
-                                    bmiCategory = state.bmiCategory,
+                    ModernSummaryScreen(
+                        summaryState = SummaryState(
+                            aiSummary = aiSummary.orEmpty(),
+                            goal = state.primaryGoal.orEmpty(),
+                            intensity = state.exerciseIntensity.orEmpty(),
+                            daysAvailable = state.daysAvailable.orEmpty(),
+                            experienceLevel = state.experienceLevel.orEmpty(),
+                            focusArea = state.focusArea.orEmpty(),
+                            isLoading = isGeneratingSummary || state.isLoading
+                        ),
+                        onGenerateClick = {
+                            // Only generate if we haven't generated yet in this session
+                            if (hasGeneratedOnce) {
+                                android.util.Log.d("AskAI", "Schedule already generated in this session, skipping regeneration")
+                                Toast.makeText(context, "Schedule already generated. Click Regenerate to create a new one or Save to finish.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                android.util.Log.d("AskAI", "Generate button clicked at step 7")
+                                state = state.copy(isLoading = true)
+                                scope.launch {
+                                    try {
+                                        val params = DailyQuestParams(
+                                            bmiCategory = state.bmiCategory,
                                     goal = state.primaryGoal ?: "maintain",
                                     intensity = state.exerciseIntensity ?: "medium",
                                     timeAvailable = mapDaysToTime(state.daysAvailable),
@@ -627,8 +533,7 @@ Keep the summary concise but comprehensive, and reference their actual progress 
                                     android.util.Log.d("AskAI", "Stored initial schedule in history. Pool: $poolIndex, hasGeneratedOnce: true")
                                 }
                                 
-                                // Wait 5 seconds before finishing to show loading state and ensure good random seed
-                                kotlinx.coroutines.delay(5000)
+                                // Removed artificial delay to make generation feel instant
                                 regenerationVersion++  // Force recomposition on first generate
                                 android.util.Log.d("AskAI", "Generated INITIAL schedule size: ${generated?.size ?: 0}, version: $regenerationVersion, pool index: $poolIndex")
                                 generated?.forEachIndexed { idx, task ->
@@ -639,8 +544,11 @@ Keep the summary concise but comprehensive, and reference their actual progress 
                                 generated = emptyList()
                             }
                             state = state.copy(isLoading = false)
+                            }
                         }
-                    }, onBack = { state = state.copy(currentStep = 6) })
+                    },
+                        onBackClick = { state = state.copy(currentStep = 6) }
+                    )
                 }
             }
         }
@@ -930,56 +838,6 @@ fun StepChallenges(state: UserDiscoveryState, onStateChange: (UserDiscoveryState
 }
 
 @Composable
-fun SummaryStep(state: UserDiscoveryState, aiSummary: String? = null, isLoading: Boolean, onGenerate: () -> Unit, onBack: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        aiSummary?.let { s ->
-            val cleaned = remember(s) { sanitizeMarkdown(s) }
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("AI-generated Summary", fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(cleaned)
-                }
-            }
-        }
-
-        Text("Summary", style = MaterialTheme.typography.headlineSmall)
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryRow("Goal", state.primaryGoal ?: "—")
-                HorizontalDivider()
-                SummaryRow("Workout Intensity", state.exerciseIntensity ?: "—")
-                HorizontalDivider()
-                SummaryRow("Days Available", state.daysAvailable ?: "—")
-                HorizontalDivider()
-                SummaryRow("Experience Level", state.experienceLevel ?: "—")
-                HorizontalDivider()
-                SummaryRow("Focus Area", state.focusArea ?: "—")
-            }
-        }
-        Button(onClick = onGenerate, modifier = Modifier.fillMaxWidth(), enabled = !isLoading) { Text("Generate") }
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Back") }
-    }
-}
-
-private fun sanitizeMarkdown(input: String): String {
-    var t = input
-    t = t.replace("**", "")
-        .replace("*", "")
-        .replace("_", "")
-    t = t.split('\n').joinToString("\n") { line ->
-        line.replace(Regex("""^\s*#{1,6}\s*"""), "")
-    }
-    t = t.split('\n').joinToString("\n") { line ->
-        line.replace(Regex("""^\s*[-•]\s+"""), "• ")
-    }
-    t = t.replace("```", "")
-        .replace("`", "")
-    t = t.replace(Regex("""[ \t]{2,}"""), " ")
-    return t.trim()
-}
-
-@Composable
 fun PreviewAndSave(
     schedule: List<QuestTask>, 
     isLoading: Boolean = false, 
@@ -1006,7 +864,6 @@ fun PreviewAndSave(
         }
         
         if (isLoading) {
-            // Show loading state
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(
@@ -1058,7 +915,6 @@ fun PreviewAndSave(
             }
         }
         
-        // Action buttons
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = onRegenerate, 
@@ -1075,14 +931,6 @@ fun PreviewAndSave(
                 Text("Save")
             }
         }
-    }
-}
-
-@Composable
-fun SummaryRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label)
-        Text(value, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -1103,35 +951,29 @@ fun mapExerciseFrequencyToHistory(freq: String?): String = when (freq) {
 }
 
 fun mapDaysToTime(days: String?): Int = when (days) {
-    "3-4" -> 30  // Limited time per session
-    "5-6" -> 45  // Moderate time per session
-    "7" -> 60    // Full time per session
-    else -> 45   // Default moderate
+    "3-4" -> 30
+    "5-6" -> 45
+    "7" -> 60
+    else -> 45
 }
 
 fun mapDaysToDaysPerWeek(days: String?): Int = when (days) {
-    "3-4" -> 4   // 3-4 workout days
-    "5-6" -> 6   // 5-6 workout days
-    "7" -> 7     // Daily workouts
-    else -> 7    // Default full week
+    "3-4" -> 4
+    "5-6" -> 6
+    "7" -> 7
+    else -> 7
 }
 
-/**
- * Check if two schedules are similar (more than 50% tasks are the same)
- * Returns true if schedules are similar (should be avoided), false if they're different enough
- */
 fun schedulesSimilar(schedule1: List<QuestTask>, schedule2: List<QuestTask>): Boolean {
     if (schedule1.size != schedule2.size) return false
     
     var matchingTasks = 0
     for (i in schedule1.indices) {
-        // Compare task descriptions (the main identifier)
         if (schedule1[i].task == schedule2[i].task) {
             matchingTasks++
         }
     }
     
-    // If more than 50% tasks are the same, consider schedules similar
     val similarityThreshold = 0.5
     val similarity = matchingTasks.toDouble() / schedule1.size.toDouble()
     
@@ -1140,65 +982,63 @@ fun schedulesSimilar(schedule1: List<QuestTask>, schedule2: List<QuestTask>): Bo
     return similarity > similarityThreshold
 }
 
-/**
- * Get user's progress statistics from saved schedule and completed tasks
- */
-fun getProgressStats(context: android.content.Context, generatedSchedule: List<QuestTask>): Map<String, Any> {
-    return try {
-        val prefs = context.getSharedPreferences("daily_quest_prefs", android.content.Context.MODE_PRIVATE)
-        
-        // Get completed tasks for today
-        val completedStr = prefs.getString("daily_completed", "") ?: ""
-        val completedCount = if (completedStr.isBlank()) 0 else completedStr.split(",").size
-        
-        // Get total tasks from saved schedule
-        val scheduleJson = prefs.getString("weekly_schedule_json", "") ?: ""
-        val totalCount = if (scheduleJson.isBlank()) {
-            generatedSchedule.size
-        } else {
-            try {
-                com.google.gson.Gson().fromJson(scheduleJson, Array<QuestTask>::class.java).size
-            } catch (e: Exception) {
-                generatedSchedule.size
-            }
-        }
-        
-        // Calculate completion rate
-        val completionRate = if (totalCount > 0) {
-            ((completedCount * 100) / totalCount)
-        } else {
-            0
-        }
-        
-        // Determine consistency message
-        val consistency = when {
-            completedCount == 0 -> "Just started - beginning the journey!"
-            completionRate >= 80 -> "Excellent - highly consistent!"
-            completionRate >= 60 -> "Good - maintaining momentum"
-            completionRate >= 40 -> "Moderate - building the habit"
-            else -> "Getting started - every step counts"
-        }
-        
-        // Get last updated date
-        val lastUpdated = prefs.getString("daily_completed_date", "") ?: "Today"
-        val lastUpdatedDisplay = if (lastUpdated == java.time.LocalDate.now().toString()) "Today" else lastUpdated
-        
-        mapOf(
-            "completedCount" to completedCount,
-            "totalCount" to totalCount,
-            "completionRate" to completionRate,
-            "consistency" to consistency,
-            "lastUpdated" to lastUpdatedDisplay
-        )
-    } catch (e: Exception) {
-        mapOf(
-            "completedCount" to 0,
-            "totalCount" to 0,
-            "completionRate" to 0,
-            "consistency" to "Just started",
-            "lastUpdated" to "Today"
-        )
+fun generateDefaultTips(state: UserDiscoveryState): List<String> {
+    val tips = mutableListOf<String>()
+    
+    val goal = state.primaryGoal?.lowercase() ?: "maintain"
+    val intensity = state.exerciseIntensity?.lowercase() ?: "medium"
+    val experience = state.experienceLevel?.lowercase() ?: "intermediate"
+    val focusArea = state.focusArea?.lowercase() ?: "mixed"
+    
+    // Tip based on goal
+    when {
+        goal.contains("weight loss") -> tips.add("For weight loss, combine cardio 3-4x/week with strength training to preserve muscle while burning calories.")
+        goal.contains("muscle") -> tips.add("To build muscle, prioritize compound exercises (squats, deadlifts) with progressive overload and adequate protein intake.")
+        goal.contains("cardio") -> tips.add("For pure cardio focus: mix running, cycling, or swimming. Vary your pace to prevent plateaus.")
+        else -> tips.add("Maintain moderate intensity with proper rest periods. This allows for sustainable long-term progress.")
     }
+    
+    // Tip based on intensity
+    when {
+        intensity.contains("high") -> tips.add("With high intensity training, ensure 48 hours recovery between intense sessions to prevent overtraining.")
+        intensity.contains("low") -> tips.add("Start with light to moderate intensity, focusing on form and consistency before increasing difficulty.")
+        else -> tips.add("Maintain moderate intensity with proper rest periods. This allows for sustainable long-term progress.")
+    }
+    
+    // Tip based on experience
+    when {
+        experience.contains("beginner") -> tips.add("Focus on mastering proper form before increasing weight or intensity. Consistency beats perfection.")
+        experience.contains("intermediate") -> tips.add("You're ready to incorporate progressive overload. Track your metrics and aim to improve weekly.")
+        else -> tips.add("Challenge yourself with new variations and advanced techniques to continue improving.")
+    }
+    
+    // Tip based on focus area
+    if (focusArea.contains("cardio") && focusArea.contains("strength")) {
+        tips.add("Balance cardio and strength training: 2-3 strength sessions and 2-3 cardio sessions per week for optimal results.")
+    } else if (focusArea.contains("cardio")) {
+        tips.add("Mix steady-state and interval cardio to improve endurance while keeping workouts engaging.")
+    } else if (focusArea.contains("strength")) {
+        tips.add("Prioritize compound lifts and track progressive overload weekly to build strength consistently.")
+    } else {
+        tips.add("Keep a balanced split: alternate cardio and strength days to recover better and avoid plateaus.")
+    }
+
+    // Ensure we always return 4 tips by adding curated fallbacks
+    val fallbacks = listOf(
+        "Stay hydrated and aim for 7-9 hours of sleep to support recovery and performance.",
+        "Schedule workouts on your calendar to build consistency and reduce decision fatigue.",
+        "Warm up for 5-10 minutes and cool down to reduce injury risk and improve mobility.",
+        "Track small wins weekly to stay motivated and see progress over time."
+    )
+
+    val uniqueTips = tips.distinct().toMutableList()
+    var i = 0
+    while (uniqueTips.size < 4 && i < fallbacks.size) {
+        if (!uniqueTips.contains(fallbacks[i])) uniqueTips.add(fallbacks[i])
+        i++
+    }
+
+    return uniqueTips.take(4)
 }
 
 // lightweight local state type shared with this file

@@ -15,7 +15,7 @@ import androidx.navigation.NavController
 fun AboutScreen(navController: NavController) {
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally

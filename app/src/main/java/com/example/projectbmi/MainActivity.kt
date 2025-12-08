@@ -1,6 +1,7 @@
 package com.example.projectbmi
 
 import android.os.Bundle
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
@@ -20,10 +21,18 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projectbmi.HistoryViewModel
+import com.example.projectbmi.model.QuestTask
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize notification channel for reminders
+        NotificationHelper.createNotificationChannel(this)
+        
+        // Log notification setup
+        android.util.Log.d("MainActivity", "Notification channel created")
+        
         // Install a global uncaught-exception handler to capture crashes
         try {
             Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->

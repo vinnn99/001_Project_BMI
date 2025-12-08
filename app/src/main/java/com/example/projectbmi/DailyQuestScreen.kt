@@ -147,7 +147,7 @@ fun DailyQuestScreen(navController: NavController) {
         }
     ) { padding ->
         Column(modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(padding)
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
@@ -172,8 +172,8 @@ fun DailyQuestScreen(navController: NavController) {
 
             Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Color(0xFFF8FAF0)) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    val days = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
-                    val todayIdx = LocalDate.now().dayOfWeek.value % 7
+                    val days = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                    val todayIdx = (LocalDate.now().dayOfWeek.value - 1) % 7  // Monday = 0, Sunday = 6
                     if (schedule.value.isEmpty()) {
                         Column(
                             modifier = Modifier

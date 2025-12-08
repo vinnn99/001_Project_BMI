@@ -19,9 +19,9 @@ object DeepseekRepository {
         get() = BuildConfig.DEEPSEEK_API_KEY
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
     /**
@@ -30,6 +30,14 @@ object DeepseekRepository {
      */
     suspend fun sendMessage(userMessage: String, context: String = ""): String = withContext(Dispatchers.IO) {
         try {
+            // Validate API key first
+            if (API_KEY.isBlank() || API_KEY == "") {
+                android.util.Log.e("DeepseekRepository", "API_KEY is empty or not set!")
+                return@withContext "❌ API key not configured. Please add DEEPSEEK_API_KEY to local.properties"
+            }
+            
+            android.util.Log.d("DeepseekRepository", "Sending message: $userMessage")
+            
             val systemPrompt = """
                 You are a health and fitness coach assistant helping users with BMI tracking and wellness.
                 Keep responses concise (1-2 sentences max) and actionable.
@@ -82,15 +90,24 @@ object DeepseekRepository {
                 return@withContext "API Error: ${response.code} - $errorBody"
             }
         } catch (e: UnknownHostException) {
+            android.util.Log.e("DeepseekRepository", "UnknownHostException: ${e.message}", e)
             return@withContext "❌ No internet connection. Please check your network."
         } catch (e: SocketTimeoutException) {
+            android.util.Log.e("DeepseekRepository", "SocketTimeoutException: ${e.message}", e)
             return@withContext "⏱️ Weak connection or timeout. Please try again later."
         } catch (e: java.net.ConnectException) {
+            android.util.Log.e("DeepseekRepository", "ConnectException: ${e.message}", e)
             return@withContext "❌ Unable to connect. Check your internet connection."
+        } catch (e: javax.net.ssl.SSLException) {
+            android.util.Log.e("DeepseekRepository", "SSLException: ${e.message}", e)
+            return@withContext "🔐 Connection security issue. Please check your internet connection."
         } catch (e: java.io.IOException) {
+            android.util.Log.e("DeepseekRepository", "IOException: ${e.message}", e)
             return@withContext "❌ Network error: ${e.message ?: "Connection failed"}"
         } catch (e: Exception) {
-            return@withContext "⚠️ Error: ${e.localizedMessage ?: "An error occurred"}"
+            android.util.Log.e("DeepseekRepository", "Unexpected error: ${e.message}", e)
+            e.printStackTrace()
+            return@withContext "⚠️ Error: ${e.message ?: "An error occurred"}"
         }
     }
 }

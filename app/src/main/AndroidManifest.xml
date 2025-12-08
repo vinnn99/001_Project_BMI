@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Required to check network connectivity state from NetworkUtils -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Required for notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for exact alarm scheduling -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Required for setting alarms -->
+    <uses-permission android:name="android.permission.SET_ALARM" />
     
     <application
         android:allowBackup="true"
@@ -32,6 +38,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- BroadcastReceiver for alarm notifications -->
+        <receiver
+            android:name=".ReminderBroadcastReceiver"
+            android:exported="true"
+            android:permission="android.permission.SCHEDULE_EXACT_ALARM">
+            <intent-filter>
+                <action android:name="com.example.projectbmi.WORKOUT_REMINDER" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
