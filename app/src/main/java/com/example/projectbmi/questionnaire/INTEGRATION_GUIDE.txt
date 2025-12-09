@@ -1,0 +1,248 @@
+/**
+ * INTEGRATION GUIDE: Enhanced Questionnaire Components
+ * 
+ * This guide explains how to use the new EnhancedQuestionnaireComponentsEnhanced.kt
+ * to replace the old questionnaire UI with a modern, polished design.
+ * 
+ * FILE LOCATION: questionnaire/QuestionnaireComponentsEnhanced.kt
+ */
+
+/*
+═══════════════════════════════════════════════════════════════════════════════
+1. FEATURES OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+
+✓ VISUAL DESIGN
+  - Gradient background (light blue to light purple)
+  - Step-specific accent colors (Blue, Orange, Green, Purple, Red)
+  - Rounded cards with shadows and elevation
+  - Modern Material 3 styling
+
+✓ INTERACTIONS
+  - Smooth hover/selection animations
+  - Scale animations on card selection
+  - Checkmark animation on selection
+  - Ripple effects on click
+  - Color transitions for all interactive elements
+
+✓ PROGRESS TRACKING
+  - Step counter display (e.g., "Step 1/5")
+  - Animated progress bar
+  - Step indicator dots with animation
+  - Visual hierarchy with accent colors
+
+✓ RESPONSIVE DESIGN
+  - Works on all screen sizes
+  - Proper spacing and padding
+  - Adaptive layouts
+
+═══════════════════════════════════════════════════════════════════════════════
+2. MAIN COMPONENT: EnhancedQuestionnaireScreen
+═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+fun EnhancedQuestionnaireScreen(
+    screen: QuestionScreen,           // Question data from QuestionnaireData
+    stepNumber: Int,                  // Current step (1-5)
+    totalSteps: Int,                  // Total steps (always 5)
+    selectedOptions: Set<String>,     // Currently selected options
+    onSelectionChange: (String) -> Unit, // Called when option is selected/deselected
+    onNextClick: () -> Unit,          // Called when Next button clicked
+    progress: Float,                  // Progress (0.0 to 1.0), calculated as stepNumber/totalSteps
+    modifier: Modifier = Modifier
+)
+
+EXAMPLE USAGE IN AskAIScreenClean:
+─────────────────────────────────────────────────────────────────────────────
+
+when (state.currentStep) {
+    in 1..5 -> {
+        val screenIndex = state.currentStep - 1
+        var currentScreen = QuestionnaireData.screens[screenIndex]
+        
+        // Filter options for step 1 if needed
+        if (state.currentStep == 1) {
+            val filteredGoalOptions = QuestionnaireData.getFilteredGoalOptions(state.bmiCategory)
+            currentScreen = currentScreen.copy(options = filteredGoalOptions)
+        }
+        
+        // Build selected options set
+        val selectedOptions = when (state.currentStep) {
+            1 -> state.primaryGoal?.let { setOf(it) } ?: emptySet()
+            2 -> state.exerciseIntensity?.let { setOf(it) } ?: emptySet()
+            3 -> state.daysAvailable?.let { setOf(it) } ?: emptySet()
+            4 -> state.experienceLevel?.let { setOf(it) } ?: emptySet()
+            5 -> state.focusArea?.let { setOf(it) } ?: emptySet()
+            else -> emptySet()
+        }
+        
+        // Use enhanced component
+        EnhancedQuestionnaireScreen(
+            screen = currentScreen,
+            stepNumber = state.currentStep,
+            totalSteps = 5,
+            selectedOptions = selectedOptions,
+            onSelectionChange = { value ->
+                // Update state based on current step
+                state = when (state.currentStep) {
+                    1 -> state.copy(primaryGoal = value)
+                    2 -> state.copy(exerciseIntensity = value)
+                    3 -> state.copy(daysAvailable = value)
+                    4 -> state.copy(experienceLevel = value)
+                    5 -> state.copy(focusArea = value)
+                    else -> state
+                }
+            },
+            onNextClick = {
+                // Handle next button click - advance to next step
+                state = state.copy(currentStep = state.currentStep + 1)
+            },
+            progress = state.currentStep / 5f
+        )
+    }
+}
+
+═══════════════════════════════════════════════════════════════════════════════
+3. COLOR SYSTEM
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 1: Blue (0xFF3B82F6)
+Step 2: Orange (0xFFF97316)
+Step 3: Green (0xFF10B981)
+Step 4: Purple (0xFF8B5CF6)
+Step 5: Red (0xFFEF4444)
+
+The colors are automatically applied based on step number using StepColors object.
+All interactive elements (buttons, indicators, borders) use the step color.
+
+═══════════════════════════════════════════════════════════════════════════════
+4. SUB-COMPONENTS (If using separately)
+═══════════════════════════════════════════════════════════════════════════════
+
+If you need to build custom layouts, use these atomic components:
+
+EnhancedIconCircle()
+  - Displays icon with gradient background
+  - Props: icon, accentColor, modifier
+
+EnhancedSelectionIndicator()
+  - Radio button or checkbox with smooth animation
+  - Props: isSelected, isMultiSelect, accentColor, modifier
+
+EnhancedOptionCard()
+  - Full option card with icon, text, selection indicator
+  - Props: option, isSelected, isMultiSelect, accentColor, onClick, modifier
+
+EnhancedQuestionCard()
+  - Header card with question, subtitle, step counter
+  - Props: question, subtitle, icon, stepNumber, totalSteps, accentColor, modifier
+
+StepIndicatorDots()
+  - Animated step progress dots
+  - Props: currentStep, totalSteps, accentColor, modifier
+
+EnhancedOptionsList()
+  - Scrollable list of option cards
+  - Props: options, selectedOptions, isMultiSelect, accentColor, onSelectionChange, modifier
+
+EnhancedBottomSection()
+  - Counter and Next button
+  - Props: selectedOptions, isMultiSelect, isSingleSelectAnswered, accentColor, onNextClick, modifier
+
+═══════════════════════════════════════════════════════════════════════════════
+5. ANIMATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+Included Animations:
+  ✓ Scale animation on card selection (1.0 → 1.02)
+  ✓ Elevation animation (2dp → 12dp when selected)
+  ✓ Color transitions (all interactive elements)
+  ✓ Checkmark fade in/out animation
+  ✓ Progress bar fill animation
+  ✓ Step dots size and color animation
+  ✓ Border animation on selection
+
+All animations use spring physics or tween timing for smooth, natural motion.
+
+═══════════════════════════════════════════════════════════════════════════════
+6. DATA FLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+USER INTERACTION FLOW:
+  
+  1. Component renders with currentStep and selectedOptions
+  2. User clicks an option card
+  3. onSelectionChange() is called with the selected value
+  4. Parent composable updates state
+  5. Component recomposes with new selectedOptions
+  6. Card animates to selected state
+  7. User clicks Next button
+  8. onNextClick() is called
+  9. Parent composable advances step
+  10. Recompose with new step, colors, and questions
+
+STATE MANAGEMENT:
+  
+  The parent (AskAIScreenClean) manages:
+  - current step
+  - selected options per step
+  - all user selections
+  
+  The component only handles:
+  - Rendering UI for current step
+  - Animations
+  - Calling callbacks
+
+═══════════════════════════════════════════════════════════════════════════════
+7. RESPONSIVE BEHAVIOR
+═══════════════════════════════════════════════════════════════════════════════
+
+The component is responsive across all screen sizes:
+  - fillMaxSize() for main container
+  - fillMaxWidth() for all cards
+  - Proper padding on all sides
+  - Spacing adapts with device
+  - LazyColumn for scrollable content on small screens
+  - Works on phones (portrait), tablets (landscape)
+
+═══════════════════════════════════════════════════════════════════════════════
+8. CUSTOMIZATION GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+To customize colors:
+  1. Modify StepColors.getStepAccent(stepIndex) function
+  2. Change the Color values for each step
+  3. Example:
+     0 -> Color(0xFF3B82F6)  // Change this to your preferred color
+
+To customize animations:
+  1. Find animateFloatAsState / animateColorAsState / etc
+  2. Adjust animationSpec parameter
+  3. Example: tween(durationMillis = 500) for slower animations
+
+To customize spacing:
+  1. Look for padding(), Spacer(), Arrangement values
+  2. Adjust dp values as needed
+  3. Example: Spacer(modifier = Modifier.height(24.dp)) → (20.dp) for tighter spacing
+
+═══════════════════════════════════════════════════════════════════════════════
+9. VALIDATION & BUTTON STATE
+═══════════════════════════════════════════════════════════════════════════════
+
+Next Button Behavior:
+  - Single-select: Enabled when any option is selected
+  - Multi-select: Enabled when at least one option is selected
+  - Disabled state: Button grayed out with disabled text color
+  - The component automatically handles this logic
+
+═══════════════════════════════════════════════════════════════════════════════
+10. IMPORT STATEMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+Add this import to AskAIScreenClean.kt:
+
+import com.example.projectbmi.questionnaire.EnhancedQuestionnaireScreen
+import com.example.projectbmi.questionnaire.StepColors
+
+═══════════════════════════════════════════════════════════════════════════════
+*/

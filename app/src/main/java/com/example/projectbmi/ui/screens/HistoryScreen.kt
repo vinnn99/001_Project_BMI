@@ -1,5 +1,6 @@
 package com.example.projectbmi.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -14,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
@@ -31,7 +33,8 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun HistoryScreen(
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
     val viewModel = remember { HistoryViewModel(userId) }
@@ -47,8 +50,8 @@ fun HistoryScreen(
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            // Header
-            HeaderSection(onBackClick = onBackClick)
+            // Header with logout button
+            HeaderSection(onBackClick = onBackClick, onLogout = onLogout)
             
             // Content
             when (currentUiState) {
@@ -75,29 +78,56 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun HeaderSection(onBackClick: () -> Unit) {
+private fun HeaderSection(onBackClick: () -> Unit, onLogout: () -> Unit) {
+    val context = LocalContext.current
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBackClick, modifier = Modifier.size(40.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            IconButton(onClick = onBackClick, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color(0xFF212121),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Text(
+                "History",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF212121),
+                fontSize = 24.sp
+            )
+        }
+        
+        IconButton(
+            onClick = {
+                // Clear SharedPreferences auth flag
+                val prefs = context.getSharedPreferences("app_auth_state", android.content.Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("wasLoggedIn", false).apply()
+                // Sign out from Firebase
+                com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                onLogout()
+            },
+            modifier = Modifier.size(40.dp)
+        ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Color(0xFF212121),
+                imageVector = Icons.Default.ExitToApp,
+                contentDescription = "Logout",
+                tint = Color(0xFFE53935),
                 modifier = Modifier.size(24.dp)
             )
         }
-        Text(
-            "History",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF212121),
-            fontSize = 24.sp
-        )
     }
 }
 

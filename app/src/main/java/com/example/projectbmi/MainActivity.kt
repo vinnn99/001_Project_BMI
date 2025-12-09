@@ -12,7 +12,17 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -22,6 +32,7 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projectbmi.HistoryViewModel
 import com.example.projectbmi.model.QuestTask
+import com.example.projectbmi.ui.screens.HistoryScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,56 +62,16 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             android.util.Log.w("MainActivity", "Failed to install global exception handler", e)
         }
-        // Initialize Firebase and sign-in anonymously so we can store user profiles in Firestore
+        // Initialize Firebase - DO NOT sign in anonymously, let BMIMobileApp handle auth
         try {
             FirebaseApp.initializeApp(this)
         } catch (e: Exception) {
             // ignore if already initialized
         }
-    // Attempt anonymous sign-in and then run migration from local DataStore to Firestore if needed
-        lifecycleScope.launch {
-            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.CREATED) {
-            val auth = Firebase.auth
-            try {
-                if (auth.currentUser == null) {
-                    // await sign-in so we can get UID reliably
-                    val result = try {
-                        val signInResult = auth.signInAnonymously().await()
-                        android.widget.Toast.makeText(
-                            this@MainActivity,
-                            "Firebase connected successfully! UID: ${signInResult.user?.uid}",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                        signInResult
-                    } catch (fe: com.google.firebase.FirebaseException) {
-                        // Common case: CONFIGURATION_NOT_FOUND when Firebase Auth not configured in console
-                        android.util.Log.e("MainActivity", "FirebaseException during anonymous sign-in", fe)
-                        val msg = fe.message ?: "Firebase configuration error"
-                        // Show a friendly toast to guide the developer/user
-                        android.widget.Toast.makeText(
-                            this@MainActivity,
-                            "Firebase sign-in failed: $msg. Check google-services.json and enable Anonymous Auth in Firebase Console.",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                        null
-                    }
-
-                    val uid = result?.user?.uid
-                    if (!uid.isNullOrBlank()) {
-                        // Firestore-only mode: no local DataStore migration required
-                    }
-                } else {
-                    // already signed in; ensure migration in case sign-in happened earlier
-                    val uid = auth.currentUser?.uid
-                    if (!uid.isNullOrBlank()) {
-                        // Firestore-only mode: no local DataStore migration required
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("MainActivity", "Firebase init/signin/migration error", e)
-            }
-            }
-        }
+        
+        // Skip anonymous sign-in - it interferes with Google OAuth login flow
+        // Firebase initialization is enough for Firestore access after user logs in with Google
+        
         setContent {
             ProjectBMITheme {
                 BMIMobileApp()
@@ -112,7 +83,74 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun BMIMobileApp() {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "splash") {
+    val auth = Firebase.auth
+    
+    // Get context untuk SharedPreferences flag
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = context.getSharedPreferences("app_auth_state", Context.MODE_PRIVATE)
+    
+    // State untuk track login
+    val currentUser = remember { mutableStateOf<com.google.firebase.auth.FirebaseUser?>(null) }
+    val isListenerReady = remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        // Cek SharedPreferences - jika belum login, force sign out & clear Firebase persistence
+        val wasLoggedIn = prefs.getBoolean("wasLoggedIn", false)
+        android.util.Log.d("BMIMobileApp", "wasLoggedIn from prefs: $wasLoggedIn, currentUser: ${auth.currentUser?.email}")
+        
+        if (!wasLoggedIn) {
+            // Force sign out
+            auth.signOut()
+            
+            // Delete Firebase cache files manually
+            try {
+                val cacheDir = java.io.File(context.filesDir.parent, "com.google.firebase.auth")
+                if (cacheDir.exists()) {
+                    cacheDir.deleteRecursively()
+                    android.util.Log.d("BMIMobileApp", "Deleted Firebase cache dir")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("BMIMobileApp", "Error deleting cache", e)
+            }
+            
+            delay(500)
+            android.util.Log.d("BMIMobileApp", "Force signed out and cleared cache")
+        }
+        
+        // Register auth listener AFTER force signout
+        val listener = auth.addAuthStateListener { authInstance ->
+            currentUser.value = authInstance.currentUser
+            
+            // Update SharedPreferences based on auth state
+            if (authInstance.currentUser != null) {
+                prefs.edit().putBoolean("wasLoggedIn", true).apply()
+                android.util.Log.d("BMIMobileApp", "Listener: Logged in: ${authInstance.currentUser?.email}")
+            } else {
+                prefs.edit().putBoolean("wasLoggedIn", false).apply()
+                android.util.Log.d("BMIMobileApp", "Listener: Logged out or null")
+            }
+            
+            isListenerReady.value = true
+        }
+    }
+    
+    // Tunggu listener siap
+    if (!isListenerReady.value) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    
+    // Route based on Firebase auth state
+    val startDestination = if (currentUser.value != null) "splash" else "login"
+    
+    android.util.Log.d("BMIMobileApp", "Navigation: $startDestination, user: ${currentUser.value?.email}")
+    
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("login") {
+            com.example.projectbmi.ui.screens.LoginScreen(navController)
+        }
         composable("splash") { SplashScreen(navController) }
         // `onboarding` route removed — app now navigates to calculator directly from splash
         composable(
@@ -130,7 +168,15 @@ fun BMIMobileApp() {
             ResultScreen(navController, bmi, category, gender)
         }
         composable("history") {
-            HistoryScreen(navController)
+            HistoryScreen(
+                onBackClick = { navController.navigateUp() },
+                onLogout = {
+                    Firebase.auth.signOut()
+                    navController.navigate("login") {
+                        popUpTo("splash") { inclusive = true }
+                    }
+                }
+            )
         }
         composable("dailyquest") {
             DailyQuestScreen(navController)

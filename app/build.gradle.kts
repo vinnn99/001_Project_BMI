@@ -33,8 +33,9 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
 
-    // Google Play services base for manifest resource
+    // Google Play services
     implementation("com.google.android.gms:play-services-base:18.2.0")
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
 
     // Test Dependencies
     testImplementation("junit:junit:4.13.2")
