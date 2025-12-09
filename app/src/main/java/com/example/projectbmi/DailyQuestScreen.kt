@@ -47,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.firebase.auth.FirebaseAuth
+import com.example.projectbmi.viewmodel.HistoryViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -55,6 +57,8 @@ import java.time.LocalDate
 fun DailyQuestScreen(navController: NavController) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("daily_quest_prefs", Context.MODE_PRIVATE)
+    val userId = FirebaseAuth.getInstance().currentUser?.uid
+    val historyViewModel = remember { if (userId != null) HistoryViewModel(userId) else null }
 
     val loading = remember { mutableStateOf(false) }
     val schedule = remember { mutableStateOf<List<QuestTask>>(emptyList()) }
@@ -124,11 +128,25 @@ fun DailyQuestScreen(navController: NavController) {
         } catch (_: Exception) {}
     }
     
-    fun toggleTask(index: Int) {
+    fun toggleTask(index: Int, taskName: String) {
         val newSet = completed.value.toMutableSet()
-        if (newSet.contains(index)) newSet.remove(index) else newSet.add(index)
+        val isCompleting = !completed.value.contains(index)
+        
+        if (newSet.contains(index)) {
+            newSet.remove(index)
+        } else {
+            newSet.add(index)
+        }
+        
         completed.value = newSet.toSet()
         persistCompleted()
+        
+        // Log to Firestore if completing and user is authenticated
+        if (isCompleting && historyViewModel != null) {
+            scope.launch {
+                historyViewModel.logQuestCompletion(taskName, index.toString())
+            }
+        }
     }
 
     Scaffold(
@@ -220,7 +238,7 @@ fun DailyQuestScreen(navController: NavController) {
                                     Checkbox(
                                         checked = isDone,
                                         onCheckedChange = { _ ->
-                                            toggleTask(idx)
+                                            toggleTask(idx, t.task)
                                         },
                                         enabled = isToday
                                     )

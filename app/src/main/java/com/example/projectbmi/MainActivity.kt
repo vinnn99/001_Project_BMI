@@ -129,9 +129,6 @@ fun BMIMobileApp() {
             val gender = backStackEntry.arguments?.getString("gender") ?: "Male"
             ResultScreen(navController, bmi, category, gender)
         }
-        composable("about") {
-            AboutScreen(navController)
-        }
         composable("history") {
             HistoryScreen(navController)
         }
