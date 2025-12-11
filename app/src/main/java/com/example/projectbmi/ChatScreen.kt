@@ -183,8 +183,22 @@ private fun ChatBubble(message: ChatMessage) {
             colors = CardDefaults.cardColors(containerColor = backgroundColor)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(message.content)
+                Text(cleanMarkdownFormatting(message.content))
             }
         }
     }
+}
+
+private fun cleanMarkdownFormatting(text: String): String {
+    return text
+        .replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")  // Remove **bold**
+        .replace(Regex("\\*(.*?)\\*"), "$1")        // Remove *italic*
+        .replace(Regex("__(.*?)__"), "$1")          // Remove __bold__
+        .replace(Regex("_(.*?)_"), "$1")            // Remove _italic_
+        .replace(Regex("~~(.*?)~~"), "$1")          // Remove ~~strikethrough~~
+        .replace(Regex("`(.*?)`"), "$1")            // Remove `code`
+        .replace("# ", "")                           // Remove # headers
+        .replace("## ", "")
+        .replace("### ", "")
+        .replace("#### ", "")
 }

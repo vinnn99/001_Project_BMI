@@ -39,35 +39,40 @@ fun LoginScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(false) }
     
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            try {
-                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-                val account = task.getResult(ApiException::class.java)
-                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                
-                auth.signInWithCredential(credential)
-                    .addOnSuccessListener {
-                        Log.d("LoginScreen", "User signed in: ${it.user?.email}")
-                        isLoading = false
-                        navController.navigate("splash") {
-                            popUpTo("login") { inclusive = true }
-                        }
+        try {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            val account = task.getResult(ApiException::class.java)
+            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+            
+            auth.signInWithCredential(credential)
+                .addOnSuccessListener {
+                    Log.d("LoginScreen", "User signed in: ${it.user?.email}")
+                    isLoading = false
+                    navController.navigate("splash") {
+                        popUpTo("login") { inclusive = true }
                     }
-                    .addOnFailureListener { e ->
-                        Log.e("LoginScreen", "Sign in failed", e)
-                        isLoading = false
-                        Toast.makeText(context, "Sign in failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-            } catch (e: ApiException) {
+                }
+                .addOnFailureListener { e ->
+                    Log.e("LoginScreen", "Firebase signInWithCredential failed: ${e.message}", e)
+                    isLoading = false
+                    Toast.makeText(context, "Sign in failed: ${e.message ?: "Unknown error"}", Toast.LENGTH_LONG).show()
+                }
+        } catch (e: ApiException) {
+            // Check if it's a cancel or actual error
+            // Status code 12501 = SIGN_IN_CANCELLED (user cancelled login dialog)
+            if (e.statusCode == 12501) {
+                Log.d("LoginScreen", "User canceled login")
+                isLoading = false
+                Toast.makeText(context, "Login cancelled", Toast.LENGTH_SHORT).show()
+            } else {
                 Log.e("LoginScreen", "Google sign in failed", e)
                 isLoading = false
                 Toast.makeText(context, "Google sign in failed", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            // User cancel login
-            Log.d("LoginScreen", "User canceled login")
+        } catch (e: Exception) {
+            Log.e("LoginScreen", "Unexpected error", e)
             isLoading = false
-            Toast.makeText(context, "Login cancelled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Unexpected error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -154,8 +159,8 @@ fun LoginScreen(navController: NavController) {
             Button(
                 onClick = {
                     isLoading = true
-                    // Client ID from google-services.json (BuildConfig will be generated)
-                    val clientId = "78951502871-jqrhg1oe3pqbd97vbj0g454398kargrl.apps.googleusercontent.com"
+                    // Use web client ID for Google Sign-In
+                    val clientId = "78951502871-6n7tia1t5l5525gsao5jej0os56s8rgk.apps.googleusercontent.com"
                     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestIdToken(clientId)
                         .requestEmail()

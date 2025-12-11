@@ -851,84 +851,258 @@ fun PreviewAndSave(
         android.util.Log.d("PreviewAndSave", "Schedule items: ${schedule.map { "${it.day}: ${it.task}" }}")
     }
     
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Preview Schedule", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+    // Card gradient colors
+    val cardGradients = mapOf(
+        0 to Brush.linearGradient(colors = listOf(Color(0xFF3B82F6), Color(0xFF6366F1))),  // Blue
+        1 to Brush.linearGradient(colors = listOf(Color(0xFF8B5CF6), Color(0xFFEC4899))),  // Purple-Pink
+        2 to Brush.linearGradient(colors = listOf(Color(0xFF14B8A6), Color(0xFF10B981))),  // Teal-Green
+        3 to Brush.linearGradient(colors = listOf(Color(0xFFF59E0B), Color(0xFFFBBF24)))   // Orange-Yellow
+    )
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Header with regenerate counter
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Preview Schedule",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF1F2937)
+            )
             if (regenerateCount > 0) {
-                Text(
-                    "Regenerated: $regenerateCount/$maxRegenerations",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (regenerateCount >= maxRegenerations) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    modifier = Modifier
+                        .background(
+                            Color(0xFF6366F1).copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    color = Color.Transparent
+                ) {
+                    Text(
+                        "$regenerateCount/$maxRegenerations",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF6366F1),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
         
         if (isLoading) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(48.dp),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF6366F1),
                         strokeWidth = 4.dp
                     )
-                    Text("Generating new schedule...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "Generating new schedule...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF6B7280)
+                    )
                 }
             }
         } else if (schedule.isEmpty()) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("No schedule generated yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "No schedule generated yet",
+                    color = Color(0xFF6B7280),
+                    fontSize = 16.sp
+                )
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(schedule) { task ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    task.day.uppercase(),
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    task.task,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                items(schedule.size) { idx ->
+                    val task = schedule[idx]
+                    val gradient = cardGradients[idx % cardGradients.size]!!
+                    
+                    ScheduleCard(
+                        dayLabel = task.day.uppercase(),
+                        taskDescription = task.task,
+                        duration = task.duration,
+                        gradient = gradient,
+                        index = idx
+                    )
                 }
             }
         }
         
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Buttons
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             OutlinedButton(
-                onClick = onRegenerate, 
-                modifier = Modifier.weight(1f), 
-                enabled = !isLoading && regenerateCount < maxRegenerations
+                onClick = onRegenerate,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(50.dp),
+                enabled = !isLoading && regenerateCount < maxRegenerations,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFF6366F1)
+                ),
+                border = BorderStroke(2.dp, Color(0xFF6366F1)),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSurface)
-                } else {
-                    Text(if (regenerateCount >= maxRegenerations) "Limit Reached" else "Regenerate")
-                }
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (regenerateCount >= maxRegenerations) "Limit Reached" else "Regenerate",
+                    fontWeight = FontWeight.SemiBold
+                )
             }
-            Button(onClick = onSave, modifier = Modifier.weight(1f), enabled = !isLoading) {
-                Text("Save")
+            
+            Button(
+                onClick = onSave,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(50.dp),
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF3B82F6)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Save", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleCard(
+    dayLabel: String,
+    taskDescription: String,
+    duration: Int,
+    gradient: Brush,
+    index: Int
+) {
+    // Get appropriate icon
+    val icon = when {
+        dayLabel.contains("MON") || dayLabel.contains("SAT") -> Icons.Default.DirectionsWalk
+        dayLabel.contains("WED") -> Icons.Default.FitnessCenter
+        dayLabel.contains("FRI") -> Icons.Default.LocalDining
+        else -> Icons.Default.Favorite
+    }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(gradient)
+                .padding(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Day label
+                        Text(
+                            dayLabel,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        
+                        // Task description
+                        Text(
+                            taskDescription,
+                            fontSize = 14.sp,
+                            color = Color.White.copy(alpha = 0.95f),
+                            lineHeight = 20.sp
+                        )
+                    }
+                    
+                    // Icon
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                
+                // Duration badge
+                Row(
+                    modifier = Modifier
+                        .background(
+                            Color.White.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        "$duration minutes",
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }

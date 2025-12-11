@@ -92,11 +92,26 @@ fun BMIMobileApp() {
     // State untuk track login
     val currentUser = remember { mutableStateOf<com.google.firebase.auth.FirebaseUser?>(null) }
     val isListenerReady = remember { mutableStateOf(false) }
+    val isLoggingOut = remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
         // Cek SharedPreferences - jika belum login, force sign out & clear Firebase persistence
         val wasLoggedIn = prefs.getBoolean("wasLoggedIn", false)
-        android.util.Log.d("BMIMobileApp", "wasLoggedIn from prefs: $wasLoggedIn, currentUser: ${auth.currentUser?.email}")
+        val appInitialized = prefs.getBoolean("app_initialized", false)
+        
+        android.util.Log.d("BMIMobileApp", "wasLoggedIn from prefs: $wasLoggedIn, appInitialized: $appInitialized, currentUser: ${auth.currentUser?.email}")
+        
+        // First time app launch - clear all user data
+        if (!appInitialized) {
+            android.util.Log.d("BMIMobileApp", "First app launch - clearing all user data")
+            val bmiPrefs = context.getSharedPreferences("bmi_prefs", Context.MODE_PRIVATE)
+            bmiPrefs.edit().clear().commit()
+            
+            val dailyQuestPrefs = context.getSharedPreferences("daily_quest_prefs", Context.MODE_PRIVATE)
+            dailyQuestPrefs.edit().clear().commit()
+            
+            prefs.edit().putBoolean("app_initialized", true).commit()
+        }
         
         if (!wasLoggedIn) {
             // Force sign out
@@ -171,10 +186,33 @@ fun BMIMobileApp() {
             HistoryScreen(
                 onBackClick = { navController.navigateUp() },
                 onLogout = {
+                    isLoggingOut.value = true
+                    
+                    // Clear ALL app data FIRST before sign out
+                    val bmiPrefs = context.getSharedPreferences("bmi_prefs", Context.MODE_PRIVATE)
+                    bmiPrefs.edit().clear().commit()
+                    android.util.Log.d("Logout", "bmi_prefs cleared")
+                    
+                    val dailyQuestPrefs = context.getSharedPreferences("daily_quest_prefs", Context.MODE_PRIVATE)
+                    dailyQuestPrefs.edit().clear().commit()
+                    android.util.Log.d("Logout", "daily_quest_prefs cleared")
+                    
+                    prefs.edit().putBoolean("wasLoggedIn", false).commit()
+                    android.util.Log.d("Logout", "wasLoggedIn set to false")
+                    
+                    // Verify cleared
+                    val verifyBmi = bmiPrefs.getString("last_bmi", null)
+                    android.util.Log.d("Logout", "Verification: last_bmi after clear = $verifyBmi")
+                    
+                    // Then sign out
                     Firebase.auth.signOut()
+                    
+                    android.util.Log.d("Logout", "Firebase signed out, navigating to login")
+                    
                     navController.navigate("login") {
-                        popUpTo("splash") { inclusive = true }
+                        popUpTo(0) { inclusive = true }
                     }
+                    isLoggingOut.value = false
                 }
             )
         }

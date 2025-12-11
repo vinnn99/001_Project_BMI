@@ -503,7 +503,7 @@ fun ResultScreen(
                                 }
                             }
 
-                            val todayIndex = LocalDate.now().dayOfWeek.value % 7
+                            val todayIndex = (LocalDate.now().dayOfWeek.value - 1) % 7
                             val prefs = try {
                                 context.getSharedPreferences("daily_quest_prefs", Context.MODE_PRIVATE)
                             } catch (e: Exception) { null }

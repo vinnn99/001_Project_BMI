@@ -24,14 +24,18 @@ fun SplashScreen(navController: NavController) {
         val lastCategory = prefs.getString("last_category", null)
         val lastGender = prefs.getString("last_gender", null)
         
+        android.util.Log.d("SplashScreen", "lastBmi=$lastBmi, lastCategory=$lastCategory, lastGender=$lastGender")
+        
         // If all BMI data exists, go directly to Result screen
         if (!lastBmi.isNullOrEmpty() && !lastCategory.isNullOrEmpty() && !lastGender.isNullOrEmpty()) {
+            android.util.Log.d("SplashScreen", "Going to result screen")
             val encodedCategory = URLEncoder.encode(lastCategory, "UTF-8")
             navController.navigate("result/$lastBmi/$encodedCategory/$lastGender") {
                 popUpTo("splash") { inclusive = true }
             }
         } else {
             // Otherwise, go to BMI calculator
+            android.util.Log.d("SplashScreen", "Going to calculator screen")
                 navController.navigate("calculator?quick=false") {
                 popUpTo("splash") { inclusive = true }
             }
