@@ -30,10 +30,11 @@ pipeline {
     }
 
     // Environment variables for the pipeline
-    environment {
+        environment {
         GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
         JAVA_OPTS = "-Xmx2g"
         ANDROID_SDK_ROOT = "/usr/lib/android-sdk"
+        ANDROID_HOME = "/usr/lib/android-sdk"
     }
 
     // Pipeline triggers (optional)
