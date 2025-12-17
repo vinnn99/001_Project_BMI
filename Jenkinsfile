@@ -144,14 +144,24 @@ pipeline {
                     echo "Accepting Android SDK licenses..."
                     # Create license files in workspace first
                     mkdir -p ./licenses
-                    echo -e "\\n8933bad161af4d5d5a97f8ba6f179d5afc0a28f8" > ./licenses/android-sdk-license
-                    echo -e "\\n84861d99f48726d6882ecb687bab996e17f0ed39d" > ./licenses/android-sdk-preview-license
                     
-                    # Copy to SDK directory with sudo
+                    # Main SDK license
+                    echo -e "\\n8933bad161af4d5d5a97f8ba6f179d5afc0a28f8" > ./licenses/android-sdk-license
+                    
+                    # Preview license
+                    printf "\\n84861d99f48726d6882ecb687bab996e17f0ed39d\\nd56f5187479451eabf01fb78af6dfcb131b33968f\\n" > ./licenses/android-sdk-preview-license
+                    
+                    # Ensure directory exists
                     sudo mkdir -p /usr/lib/android-sdk/licenses
+                    
+                    # Copy all licenses
                     sudo cp ./licenses/android-sdk-license /usr/lib/android-sdk/licenses/
                     sudo cp ./licenses/android-sdk-preview-license /usr/lib/android-sdk/licenses/
+                    
+                    # Verify licenses
                     echo "✓ Licenses configured"
+                    echo "Installed licenses:"
+                    ls -la /usr/lib/android-sdk/licenses/ || true
                 '''
                 
                 // Run Gradle test task
