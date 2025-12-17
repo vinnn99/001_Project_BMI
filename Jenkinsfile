@@ -46,6 +46,9 @@ pipeline {
                     SDK_ROOT="$WORKSPACE/android-sdk"
                     mkdir -p "$SDK_ROOT"
 
+                    # Clean up old cmdline-tools if exists
+                    rm -rf "$SDK_ROOT/cmdline-tools"
+
                     TOOLS_ZIP="$WORKSPACE/cmdline-tools.zip"
                     TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip"
                     if command -v curl >/dev/null 2>&1; then
