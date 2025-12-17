@@ -142,9 +142,15 @@ pipeline {
                 // Accept Android SDK licenses automatically
                 sh '''
                     echo "Accepting Android SDK licenses..."
+                    # Create license files in workspace first
+                    mkdir -p ./licenses
+                    echo -e "\\n8933bad161af4d5d5a97f8ba6f179d5afc0a28f8" > ./licenses/android-sdk-license
+                    echo -e "\\n84861d99f48726d6882ecb687bab996e17f0ed39d" > ./licenses/android-sdk-preview-license
+                    
+                    # Copy to SDK directory with sudo
                     sudo mkdir -p /usr/lib/android-sdk/licenses
-                    sudo bash -c 'echo -e "\\n8933bad161af4d5d5a97f8ba6f179d5afc0a28f8" > /usr/lib/android-sdk/licenses/android-sdk-license'
-                    sudo bash -c 'echo -e "\\n84861d99f48726d6882ecb687bab996e17f0ed39d" > /usr/lib/android-sdk/licenses/android-sdk-preview-license'
+                    sudo cp ./licenses/android-sdk-license /usr/lib/android-sdk/licenses/
+                    sudo cp ./licenses/android-sdk-preview-license /usr/lib/android-sdk/licenses/
                     echo "✓ Licenses configured"
                 '''
                 
