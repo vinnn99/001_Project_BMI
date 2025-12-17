@@ -139,6 +139,15 @@ pipeline {
                     echo '================================'
                 }
                 
+                // Accept Android SDK licenses automatically
+                sh '''
+                    echo "Accepting Android SDK licenses..."
+                    mkdir -p /usr/lib/android-sdk/licenses
+                    echo -e "\n8933bad161af4d5d5a97f8ba6f179d5afc0a28f8" > /usr/lib/android-sdk/licenses/android-sdk-license || true
+                    echo -e "\n84861d99f48726d6882ecb687bab996e17f0ed39d" > /usr/lib/android-sdk/licenses/android-sdk-preview-license || true
+                    echo "✓ Licenses configured"
+                '''
+                
                 // Run Gradle test task
                 sh '''
                     echo "Executing unit tests..."
