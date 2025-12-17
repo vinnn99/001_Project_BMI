@@ -221,13 +221,15 @@ fun BMIMobileApp() {
         }
         composable("askAI") {
             val context = androidx.compose.ui.platform.LocalContext.current
-            // Get BMI category from SharedPreferences
+            // Get BMI category and age from SharedPreferences
             val prefs = context.getSharedPreferences("bmi_prefs", android.content.Context.MODE_PRIVATE)
             val bmiCategory = prefs.getString("last_category", "Normal") ?: "Normal"
+            val userAge = prefs.getInt("last_age", 30)  // Default 30 if not found
             
             AskAIScreenClean(
                 navController = navController,
                 userBMICategory = bmiCategory,
+                userAge = userAge,
                 onSaveSchedule = { schedule ->
                     try {
                         val questPrefs = context.getSharedPreferences("daily_quest_prefs", android.content.Context.MODE_PRIVATE)

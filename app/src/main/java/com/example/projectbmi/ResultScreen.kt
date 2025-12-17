@@ -118,15 +118,6 @@ fun ResultScreen(
                         fontSize = 18.sp
                     ) 
                 },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color(0xFF5A4AE3)
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.White,
                     navigationIconContentColor = Color(0xFF5A4AE3),

@@ -3,6 +3,7 @@ package com.example.projectbmi
 import com.example.projectbmi.model.BMIRecord
 import com.example.projectbmi.model.QuestTask
 import com.example.projectbmi.model.DailyQuestParams
+import com.example.projectbmi.model.IntensityRecommendation
 import java.util.UUID
 
 /**
@@ -99,6 +100,71 @@ object AIRepository {
      * This provides personalization beyond just goal + intensity.
      * Applies smart scheduling that works from any day of the week.
      */
+    /**
+     * Adjust workout tasks based on user's age for safety and effectiveness.
+     * Modifies duration, intensity, exercise type based on age group.
+     */
+    private fun adjustScheduleForAge(baseSchedule: List<QuestTask>, age: Int): List<QuestTask> {
+        if (age < 16 || age > 120) return baseSchedule  // Invalid age, return as-is
+        
+        return baseSchedule.map { task ->
+            when {
+                age in 16..25 -> {
+                    // Young adults (20s): Can do high intensity, increase duration slightly
+                    task.copy(
+                        duration = (task.duration * 1.1).toInt(),  // 10% longer
+                        notes = when {
+                            task.notes.contains("low-impact") -> task.notes.replace("low-impact", "high intensity")
+                            else -> task.notes + " (high capacity - push yourself!)"
+                        }
+                    )
+                }
+                age in 26..35 -> {
+                    // Early adulthood: Balanced approach, no major changes
+                    task
+                }
+                age in 36..50 -> {
+                    // Mid-life (40-50 range): Longer recovery, slightly lower duration
+                    val reducedDuration = (task.duration * 0.9).toInt().coerceAtLeast(10)
+                    task.copy(
+                        duration = reducedDuration,
+                        notes = task.notes + " (focus on proper form & recovery)"
+                    )
+                }
+                age in 51..65 -> {
+                    // Late adulthood (50-65): Low intensity, even shorter duration, injury prevention
+                    val safeDuration = (task.duration * 0.75).toInt().coerceAtLeast(10)
+                    val safeCategory = when (task.category) {
+                        "cardio" -> "cardio"  // Keep but modify
+                        "strength" -> "strength"  // Keep but lighter
+                        else -> task.category
+                    }
+                    task.copy(
+                        category = safeCategory,
+                        duration = safeDuration,
+                        intensity = "low",
+                        notes = "Joint-friendly, 2-3 min rest between sets. Stop if pain occurs."
+                    )
+                }
+                else -> {
+                    // 65+: Senior - Very low intensity, flexibility focus, safety critical
+                    val seniorDuration = (task.duration * 0.6).toInt().coerceAtLeast(10)
+                    val seniorCategory = when (task.category) {
+                        "strength" -> "flexibility"  // Replace heavy strength with flexibility
+                        "cardio" -> "cardio"  // Keep but very light
+                        else -> task.category
+                    }
+                    task.copy(
+                        category = seniorCategory,
+                        duration = seniorDuration,
+                        intensity = "low",
+                        notes = "Very gentle. Warm up 10 min. Do with supervision if needed. Focus on balance & flexibility."
+                    )
+                }
+            }
+        }
+    }
+    
     private fun adjustSchedule(baseSchedule: List<QuestTask>, params: DailyQuestParams): List<QuestTask> {
         var adjusted = baseSchedule.toList()
         
@@ -151,6 +217,148 @@ object AIRepository {
         }
         
         return adjusted
+    }
+
+    /**
+     * Adjust workout intensity, duration, and type based on user's age.
+     * Returns adjusted DailyQuestParams that's age-appropriate.
+     * 
+     * Age Groups:
+     * - 16-25: Young adults - high capacity, can handle high intensity
+     * - 26-35: Early adulthood - balanced approach
+     * - 36-50: Mid-life - moderate intensity, focus on recovery
+     * - 50-65: Late adulthood - low-medium intensity, injury prevention
+     * - 65+: Senior - low intensity, flexibility & balance focus
+     */
+    private fun adjustParamsForAge(params: DailyQuestParams, age: Int): DailyQuestParams {
+        return when {
+            age in 16..25 -> {
+                // Young adults: can handle original intensity, even boost it
+                params.copy(
+                    intensity = when (params.intensity) {
+                        "low" -> "low"  // Keep as is
+                        "medium" -> "high"  // Can upgrade medium to high
+                        "high" -> "high"  // Already high
+                        else -> params.intensity
+                    }
+                )
+            }
+            age in 26..35 -> {
+                // Early adults: keep intensity as requested
+                params
+            }
+            age in 36..50 -> {
+                // Mid-life: moderate intensity, focus on recovery
+                params.copy(
+                    intensity = when (params.intensity) {
+                        "low" -> "low"
+                        "medium" -> "medium"
+                        "high" -> "medium"  // Downgrade high to medium
+                        else -> params.intensity
+                    }
+                )
+            }
+            age in 51..65 -> {
+                // Late adulthood: low-medium intensity, injury prevention
+                params.copy(
+                    intensity = when (params.intensity) {
+                        "low" -> "low"
+                        "medium" -> "low"  // Downgrade medium to low
+                        "high" -> "low"  // Downgrade high to low
+                        else -> params.intensity
+                    }
+                )
+            }
+            else -> {
+                // 65+: Senior - low intensity, flexibility & balance focus
+                params.copy(
+                    intensity = "low",  // Always low for seniors
+                    focusArea = "flexibility"  // Prioritize flexibility
+                )
+            }
+        }
+    }
+
+    /**
+     * Check if intensity needs confirmation based on age and selected intensity.
+     * Returns IntensityRecommendation with recommendation details.
+     * 
+     * Age-based recommendations:
+     * - 16-25: Recommend HIGH (high capacity)
+     * - 26-35: Recommend same as selected (balanced approach)
+     * - 36-50: Recommend MEDIUM (moderate intensity)
+     * - 51-65: Recommend LOW (safety first)
+     * - 65+: Recommend LOW (very low, flexibility focus)
+     */
+    fun getIntensityRecommendation(userSelectedIntensity: String, age: Int): IntensityRecommendation {
+        if (age < 16 || age > 120) {
+            // Invalid age, no recommendation
+            return IntensityRecommendation(
+                userSelected = userSelectedIntensity,
+                recommended = userSelectedIntensity,
+                userAge = age,
+                shouldShowDialog = false
+            )
+        }
+
+        val selectedLowercase = userSelectedIntensity.lowercase()
+        
+        val (recommendedIntensity, warningMsg, explanation) = when {
+            age in 16..25 -> {
+                // Young adults: recommend HIGH
+                Triple(
+                    "high",
+                    "You're young with high capacity 💪\nHIGH intensity will give you better cardiovascular & strength gains!",
+                    "Studies show young adults aged 16-25 benefit most from high-intensity workouts for optimal fitness development."
+                )
+            }
+            age in 26..35 -> {
+                // Early adults: balanced, any choice is fine
+                // No recommendation needed - all intensities ok
+                Triple(
+                    selectedLowercase,  // Whatever they selected is fine
+                    "",  // No warning
+                    ""   // No explanation needed
+                )
+            }
+            age in 36..50 -> {
+                // Mid-life: recommend MEDIUM
+                Triple(
+                    "medium",
+                    "At age $age, MEDIUM intensity is optimal ⚡\nFocus on proper form & adequate recovery to prevent injury.",
+                    "Moderate intensity at this age maintains fitness while allowing proper recovery and reduces injury risk."
+                )
+            }
+            age in 51..65 -> {
+                // Late adulthood: recommend LOW
+                Triple(
+                    "low",
+                    "For age $age, LOW intensity is safer 🛡️\nJoint-friendly exercises with 2-3 min rest between sets.",
+                    "Low-intensity workouts are proven safe and effective for this age group, with better long-term adherence."
+                )
+            }
+            else -> {
+                // 65+: recommend LOW with flexibility focus
+                Triple(
+                    "low",
+                    "For age $age, LOW intensity with flexibility focus is safest 🌿\nPrioritize warm-up, balance & balance exercises.",
+                    "Gentle exercises at this age promote longevity, balance, and reduce fall risk significantly."
+                )
+            }
+        }
+
+        // Check if recommendation differs from selection
+        // For age 26-35, recommended always equals selected, so dialog never shows
+        val shouldShowDialog = recommendedIntensity != selectedLowercase
+
+        return IntensityRecommendation(
+            userSelected = selectedLowercase,
+            recommended = recommendedIntensity,
+            userAge = age,
+            shouldShowDialog = shouldShowDialog,
+            warningMessage = warningMsg,
+            explanation = explanation
+        )
     }
 
     /**
@@ -629,10 +837,13 @@ object AIRepository {
         // Apply dynamic adjustments based on user preferences
         val adjustedSchedule = adjustSchedule(selectedTasks, params)
         
-        android.util.Log.d("AIRepository", "Base tasks: ${selectedTasks.size}, After adjustment: ${adjustedSchedule.size}, Pool: $lastGeneratedPoolIndex")
-        android.util.Log.d("AIRepository", "Sample task: ${adjustedSchedule.firstOrNull()?.let { "${it.day}: ${it.task} (${it.duration}min)" } ?: "none"}")
+        // Apply age-based adjustments for safety and effectiveness
+        val ageAdjustedSchedule = adjustScheduleForAge(adjustedSchedule, params.age)
         
-        return adjustedSchedule
+        // Log age adjustment
+        android.util.Log.d("AIRepository", "Age-based adjustment: User age=${params.age}, First task duration before=${adjustedSchedule.firstOrNull()?.duration}, after=${ageAdjustedSchedule.firstOrNull()?.duration}")
+        
+        return ageAdjustedSchedule
     }
 
     /**

@@ -12,6 +12,7 @@ data class UserDiscoveryState(
     val eatingPattern: String? = null,
     val sleepHours: String? = null,
     val challenges: List<String> = emptyList(),
+    val age: Int? = null,  // User age for age-appropriate workout recommendations
     val currentStep: Int = 1,
     val isLoading: Boolean = false
 )

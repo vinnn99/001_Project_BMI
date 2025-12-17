@@ -38,12 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projectbmi.model.BMIRecord
 import androidx.navigation.NavController
 import kotlinx.coroutines.delay
+import com.example.projectbmi.ui.theme.Dimensions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,6 +112,7 @@ fun BMICalculatorScreen(
                     )
                 )
             )
+            .systemBarsPadding()
     ) {
         Scaffold(
             containerColor = Color.Transparent,
@@ -133,7 +136,10 @@ fun BMICalculatorScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .padding(
+                            horizontal = Dimensions.cardPadding(),
+                            vertical = Dimensions.verticalSpacing()
+                        )
                         .alpha(alpha),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -207,28 +213,31 @@ fun BMICalculatorScreen(
                         ) {
                             Card(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 24.dp),
-                                shape = RoundedCornerShape(28.dp),
+                                    .fillMaxWidth(Dimensions.cardWidth())
+                                    .padding(
+                                        horizontal = Dimensions.horizontalSpacing(),
+                                        vertical = Dimensions.verticalSpacing()
+                                    ),
+                                shape = RoundedCornerShape(Dimensions.cardCornerRadius()),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(36.dp),
+                                        .padding(Dimensions.contentPadding()),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
                                         "Select Gender",
-                                        fontSize = 28.sp,
+                                        fontSize = Dimensions.titleTextSize(),
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Color(0xFF1A1A1A),
                                         letterSpacing = (-0.5).sp
                                     )
-                                    Spacer(modifier = Modifier.height(36.dp))
+                                    Spacer(modifier = Modifier.height(Dimensions.verticalSpacing()))
                                     
-                                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(Dimensions.selectionSpacing())) {
                                         // Male Card
                                         GenderCard(
                                             icon = Icons.Outlined.Male,
@@ -259,21 +268,24 @@ fun BMICalculatorScreen(
                         ) {
                             Card(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 24.dp),
-                                shape = RoundedCornerShape(28.dp),
+                                    .fillMaxWidth(Dimensions.cardWidth())
+                                    .padding(
+                                        horizontal = Dimensions.horizontalSpacing(),
+                                        vertical = Dimensions.verticalSpacing()
+                                    ),
+                                shape = RoundedCornerShape(Dimensions.cardCornerRadius()),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(36.dp),
+                                        .padding(Dimensions.contentPadding()),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
                                         "What is your age?",
-                                        fontSize = 28.sp,
+                                        fontSize = Dimensions.titleTextSize(),
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Color(0xFF1A1A1A),
                                         letterSpacing = (-0.5).sp
@@ -320,7 +332,7 @@ fun BMICalculatorScreen(
                                             ) {
                                                 Text(
                                                     age.toString(),
-                                                    fontSize = 64.sp,
+                                                    fontSize = Dimensions.largeTextSize(),
                                                     fontWeight = FontWeight.Black,
                                                     color = Color(0xFF5B67F1),
                                                     letterSpacing = (-2).sp
@@ -358,44 +370,47 @@ fun BMICalculatorScreen(
                         ) {
                             Card(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 24.dp),
-                                shape = RoundedCornerShape(28.dp),
+                                    .fillMaxWidth(Dimensions.cardWidth())
+                                    .padding(
+                                        horizontal = Dimensions.horizontalSpacing(),
+                                        vertical = Dimensions.verticalSpacing()
+                                    ),
+                                shape = RoundedCornerShape(Dimensions.cardCornerRadius()),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(36.dp),
+                                        .padding(Dimensions.contentPadding()),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
                                         "What's your height?",
-                                        fontSize = 28.sp,
+                                        fontSize = Dimensions.titleTextSize(),
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Color(0xFF1A1A1A),
                                         letterSpacing = (-0.5).sp
                                     )
                                     
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(modifier = Modifier.height(Dimensions.verticalSpacing() / 2))
                                     
                                     Text(
                                         "Enter your height in centimeters",
-                                        fontSize = 14.sp,
+                                        fontSize = Dimensions.bodyTextSize(),
                                         color = Color.Gray.copy(alpha = 0.7f)
                                     )
                                     
-                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Spacer(modifier = Modifier.height(Dimensions.verticalSpacing()))
                                     
                                     Icon(
                                         imageVector = Icons.Outlined.Straighten,
                                         contentDescription = "Height",
-                                        modifier = Modifier.size(64.dp),
+                                        modifier = Modifier.size(Dimensions.iconSize()),
                                         tint = Color(0xFF5B67F1)
                                     )
                                     
-                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Spacer(modifier = Modifier.height(Dimensions.verticalSpacing()))
 
                                     var heightInput by remember { mutableStateOf(height.toString()) }
                                     var heightError by remember { mutableStateOf("") }
@@ -417,14 +432,14 @@ fun BMICalculatorScreen(
                                         label = { 
                                             Text(
                                                 "Height (cm)",
-                                                fontSize = 14.sp,
+                                                fontSize = Dimensions.bodyTextSize(),
                                                 color = Color.Gray
                                             ) 
                                         },
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         modifier = Modifier
-                                            .fillMaxWidth(0.85f)
+                                            .fillMaxWidth(Dimensions.cardWidth())
                                             .padding(top = 8.dp),
                                         shape = RoundedCornerShape(16.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
@@ -445,7 +460,7 @@ fun BMICalculatorScreen(
                                         Text(
                                             heightError,
                                             color = MaterialTheme.colorScheme.error,
-                                            fontSize = 12.sp,
+                                            fontSize = Dimensions.bodyTextSize(),
                                             fontWeight = FontWeight.Medium,
                                             modifier = Modifier.padding(top = 8.dp)
                                         )
@@ -462,44 +477,47 @@ fun BMICalculatorScreen(
                         ) {
                             Card(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 24.dp),
-                                shape = RoundedCornerShape(28.dp),
+                                    .fillMaxWidth(Dimensions.cardWidth())
+                                    .padding(
+                                        horizontal = Dimensions.horizontalSpacing(),
+                                        vertical = Dimensions.verticalSpacing()
+                                    ),
+                                shape = RoundedCornerShape(Dimensions.cardCornerRadius()),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(36.dp),
+                                        .padding(Dimensions.contentPadding()),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
                                         "What's your weight?",
-                                        fontSize = 28.sp,
+                                        fontSize = Dimensions.titleTextSize(),
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Color(0xFF1A1A1A),
                                         letterSpacing = (-0.5).sp
                                     )
                                     
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(modifier = Modifier.height(Dimensions.verticalSpacing() / 2))
                                     
                                     Text(
                                         "Enter your weight in kilograms",
-                                        fontSize = 14.sp,
+                                        fontSize = Dimensions.bodyTextSize(),
                                         color = Color.Gray.copy(alpha = 0.7f)
                                     )
                                     
-                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Spacer(modifier = Modifier.height(Dimensions.verticalSpacing()))
                                     
                                     Icon(
                                         imageVector = Icons.Outlined.MonitorWeight,
                                         contentDescription = "Weight",
-                                        modifier = Modifier.size(64.dp),
+                                        modifier = Modifier.size(Dimensions.iconSize()),
                                         tint = Color(0xFFFF6584)
                                     )
                                     
-                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Spacer(modifier = Modifier.height(Dimensions.verticalSpacing()))
 
                                     var weightInput by remember { mutableStateOf(String.format("%.1f", weight)) }
                                     var weightError by remember { mutableStateOf("") }
@@ -530,14 +548,14 @@ fun BMICalculatorScreen(
                                         label = { 
                                             Text(
                                                 "Weight (kg)",
-                                                fontSize = 14.sp,
+                                                fontSize = Dimensions.bodyTextSize(),
                                                 color = Color.Gray
                                             ) 
                                         },
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         modifier = Modifier
-                                            .fillMaxWidth(0.85f)
+                                            .fillMaxWidth(Dimensions.cardWidth())
                                             .padding(top = 8.dp),
                                         shape = RoundedCornerShape(16.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
@@ -558,7 +576,7 @@ fun BMICalculatorScreen(
                                         Text(
                                             weightError,
                                             color = MaterialTheme.colorScheme.error,
-                                            fontSize = 12.sp,
+                                            fontSize = Dimensions.bodyTextSize(),
                                             fontWeight = FontWeight.Medium,
                                             modifier = Modifier.padding(top = 8.dp)
                                         )
@@ -569,19 +587,19 @@ fun BMICalculatorScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(Dimensions.verticalSpacing()))
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp),
+                        .padding(top = Dimensions.verticalSpacing()),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     OutlinedButton(
                         onClick = { if (step > 0) step -= 1 },
                         modifier = Modifier
                             .weight(1f)
-                            .height(60.dp),
+                            .height(Dimensions.buttonHeight()),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = Color.White
@@ -605,19 +623,19 @@ fun BMICalculatorScreen(
                             Text(
                                 "BACK",
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp,
+                                fontSize = Dimensions.buttonTextSize(),
                                 letterSpacing = 0.5.sp,
                                 color = Color.White
                             )
                         }
                     }
                     
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(Dimensions.horizontalSpacing()))
                     
                     Button(
                         modifier = Modifier
                             .weight(1f)
-                            .height(60.dp),
+                            .height(Dimensions.buttonHeight()),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White
@@ -685,7 +703,7 @@ fun BMICalculatorScreen(
                             Text(
                                 if (step < 3) "NEXT" else "FINISH",
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp,
+                                fontSize = Dimensions.buttonTextSize(),
                                 letterSpacing = 0.5.sp,
                                 color = Color(0xFF5B67F1)
                             )
@@ -728,7 +746,7 @@ fun GenderCard(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) { onClick() },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(Dimensions.cardCornerRadius()),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) Color(0xFF6366F1) else Color(0xFFF3F4F6)
         ),
@@ -739,25 +757,70 @@ fun GenderCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp),
+                .padding(Dimensions.contentPadding()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(Dimensions.iconSize()),
                 tint = if (selected) Color.White else Color(0xFF6B7280)
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(Dimensions.verticalSpacing() / 2))
             Text(
                 text = label,
-                fontSize = 18.sp,
+                fontSize = Dimensions.bodyTextSize(),
                 fontWeight = FontWeight.Bold,
                 color = if (selected) Color.White else Color(0xFF000000),
                 maxLines = 1,
                 overflow = TextOverflow.Visible
             )
         }
+    }
+}
+
+// Preview Annotations for Multi-Device Testing
+@Preview(
+    name = "Small Phone (320dp)",
+    widthDp = 320,
+    heightDp = 640,
+    showBackground = true
+)
+@Preview(
+    name = "Compact Phone (360dp)",
+    widthDp = 360,
+    heightDp = 740,
+    showBackground = true
+)
+@Preview(
+    name = "Medium Phone (390dp)",
+    widthDp = 390,
+    heightDp = 844,
+    showBackground = true
+)
+@Preview(
+    name = "Large Phone (420dp)",
+    widthDp = 420,
+    heightDp = 920,
+    showBackground = true
+)
+@Preview(
+    name = "Tablet (600dp)",
+    widthDp = 600,
+    heightDp = 960,
+    showBackground = true
+)
+@Composable
+fun PreviewBMICalculatorScreen() {
+    // Mock ViewModel for preview
+    val mockBMIViewModel = BMIViewModel()
+    
+    MaterialTheme {
+        BMICalculatorScreen(
+            navController = androidx.navigation.compose.rememberNavController(),
+            quickRecalc = false,
+            vm = mockBMIViewModel
+        )
     }
 }

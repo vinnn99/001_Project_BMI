@@ -9,5 +9,7 @@ data class DailyQuestParams(
     val focusArea: String,
     val healthStatus: String = "healthy",
     val exerciseHistory: String = "beginner",
-    val dietaryPreference: String = "omnivore"
+    val dietaryPreference: String = "omnivore",
+    val age: Int = 30  // User age for age-appropriate workout recommendations
 )
+

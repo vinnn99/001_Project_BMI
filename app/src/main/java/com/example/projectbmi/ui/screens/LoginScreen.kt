@@ -164,8 +164,11 @@ fun LoginScreen(navController: NavController) {
                     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestIdToken(clientId)
                         .requestEmail()
+                        .requestProfile()
                         .build()
                     val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                    // Force account picker to show every time (don't auto-select)
+                    googleSignInClient.signOut()  // Clear cached account
                     launcher.launch(googleSignInClient.signInIntent)
                 },
                 modifier = Modifier
