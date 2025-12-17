@@ -88,7 +88,7 @@ pipeline {
             steps {
                 echo 'Running unit tests'
                 sh '''
-                    ./gradlew test --info
+                    ./gradlew test --info -Pandroid.useAndroidX=true -Pandroid.enableJetifier=true
                 '''
             }
             post {
@@ -108,7 +108,7 @@ pipeline {
             steps {
                 echo 'Building debug APK'
                 sh '''
-                    ./gradlew clean assembleDebug --info
+                    ./gradlew clean assembleDebug --info -Pandroid.useAndroidX=true -Pandroid.enableJetifier=true
                 '''
             }
         }
